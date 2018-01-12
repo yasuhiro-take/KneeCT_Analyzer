@@ -6,8 +6,8 @@
 	<property name="build" location="bin" />
 	<property name="dist" location="dist" />
 	<property name="resource" location="resource" />
-	
-		<property name="pluginsDir" location="$basedir/../../IJ/plugins/" />
+	 
+		<property name="pluginsDir" location="$basedir/../../../workspace/IJ/plugins/" />
 	
 	<property name="username" value="hoge" />
 <target name="main" depends="compress" description="Main Target">

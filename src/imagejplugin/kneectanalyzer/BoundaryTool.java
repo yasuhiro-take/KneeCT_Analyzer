@@ -420,7 +420,8 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 			
 			if (r == null) {
 				BoundaryData bdatM = find(BD_MFC, z), bdatL = find(BD_LFC, z);
-				bdatM.fill(imp); bdatL.fill(imp);
+				if (bdatM != null)	bdatM.fill(imp); 
+				if (bdatL != null) bdatL.fill(imp);
 				r = reduceBoundaryBox((ByteProcessor)ip, cal, bdatT);
 			}
 			

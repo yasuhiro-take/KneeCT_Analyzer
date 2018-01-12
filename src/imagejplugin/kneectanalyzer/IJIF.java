@@ -60,9 +60,12 @@ public class IJIF implements Measurements {
 			ij3d = (Class.forName("ij3d.Image3DUniverse") != null);			
 		} catch (ClassNotFoundException e) {
 			ij3d = false;
+		} catch (NoClassDefFoundError e) {
+			ij3d = false;
 		} finally {
 			System.out.println("3D Viewer available? "+ij3d);
 		}
+		
 	}
 	
 	/*    -------------------------------------------------------------  
@@ -174,13 +177,15 @@ public class IJIF implements Measurements {
 	private static String getBaseDirectory() {
 		ImagePlus imp = WindowManager.getImage("Base");
 		FileInfo finfo = (imp != null) ? imp.getOriginalFileInfo() : null;
-		String basepath = (finfo != null) ? finfo.directory : openDirectoryDialog("Specify directory to save");
+		String basepath = (finfo != null) ? finfo.directory : null;
+		basepath = (basepath == null) ? openDirectoryDialog("Specify directory to save") : basepath;
 		return basepath;
 	}
 	
 	private static Calibration parseMetadata(String filedata, Calibration cal) {
 		String voxel = null;
-		String lines[] = filedata.split(System.getProperty("line.separator"));
+		//String lines[] = filedata.split(System.getProperty("line.separator"));
+		String lines[] = filedata.split("\n");
 		
 		for (int i = 0; i < lines.length; i++) {
 			if (i == 0) {
@@ -204,7 +209,7 @@ public class IJIF implements Measurements {
 		if (voxel != null) {
 			String voxeldata[] = voxel.split(" ");
 			
-			String unit = voxeldata[3].replaceAll(System.getProperty("line.separator"), "");
+			String unit = voxeldata[3].replaceAll("[\r\n]", "");
 						
 			cal.setUnit(unit);
 			cal.pixelWidth = Double.parseDouble(voxeldata[0]);

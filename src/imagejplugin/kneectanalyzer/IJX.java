@@ -627,7 +627,7 @@ class mPointList {
 	public void parsePointsFileText(String text) {
 		list.clear();
 		
-		String lines[] = text.split(LF);
+		String lines[] = text.split("\n");
 		int start = lines[0].matches(".*frame.*") ? 1 : 0;
 		
 		for (int i = start; i < lines.length; i++) {
