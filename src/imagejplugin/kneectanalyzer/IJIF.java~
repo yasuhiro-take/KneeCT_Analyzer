@@ -1,0 +1,62 @@
+package edu.osaka.ort.kca.ij;
+/*
+import ij.*;
+import ij.process.*;
+import ij.gui.*;
+import java.awt.*;
+import ij.plugin.*;
+*/
+
+public class IJIF {
+	public static boolean isStack() {
+		// check and return how many stack image open
+		if (false)
+			return true;
+		else
+			return false;
+	}
+	
+	public static boolean isBin() {
+		if (false)
+			return true;
+		else
+			return false;
+	}
+	
+	public static void openDirectoryDialog() {
+		try {
+			Thread.sleep(2000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	public static void saveModel() {
+		
+	}
+	public static void closeWorkingFiles() {
+		
+	}
+	public static int binarize() {
+		return 0;
+	}
+	public static int alignMPR() {
+		return 0;
+	}
+	public static int align3D() {
+		return 0;
+	}
+	public static int interactiveEditing() {
+		return 0;
+	}
+}
+
+/*
+public class My_Plugin implements PlugIn {
+
+	public void run(String arg) {
+		
+	}
+
+}
+*/

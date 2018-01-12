@@ -1,0 +1,128 @@
+
+/*
+private String getFECsAsString(String model) {
+	PointList pl = null;
+	if (univ != null && univ.getContent(model) == null) {
+		pl = univ.getContent(model).getPointList();
+				
+		if (pl.size() < 2)
+			pl = null;
+	}
+	
+	pl = fec;
+	if (pl == null || pl.size() < 2)
+		return null;
+	
+	String arg = "";
+	for (int i = 0; i < 2; i++) {
+		BenesNamedPoint bnp = pl.get(i);
+		if (arg != "")
+			arg += " ";
+		arg += bnp.x + " " + bnp.y + " " + bnp.z;
+	}
+	
+	return arg;
+	
+}
+*/
+/*
+public int align3D(String wintitle) {
+if (univ == null || univ.getContent(wintitle) == null)
+	return error("No 3D data. Do not close 3D Viewer.");
+
+PointList pl = univ.getContent(wintitle).getPointList();
+if (pl.size() < 2)
+	return error("<2 points available. Point-select med & lat epicondyles on 3D Viewer.");
+	
+double[] xyz = new double[6];
+for (int i = 0; i < 2; i++) {
+	BenesNamedPoint bnp = pl.get(i);
+	xyz[i * 3 + 0] = bnp.x; xyz[i * 3 + 1] = bnp.y; xyz[i * 3 + 2] = bnp.z;
+}
+
+setFEC(xyz);
+String arg = getFECString();
+
+selectWindow(wintitle);
+if (Math.abs(xyz[1] - xyz[4]) < 1.5 && Math.abs(xyz[2] - xyz[5]) < 1.5) {
+	runCommand("rename", "KCAwork-ax");
+	return 1;
+} else {
+	String ret = runKCAMacroS("KCA_align3D.ijm", arg);
+
+	if (ret == null || ret.equals(""))
+		return error("aling3D.ijm returned error.");
+	if (ret.equals("[aborted"))
+		return error("aborted align3D.", -2);
+
+	String[] l = ret.split(" ");
+			
+	for (int i = 0; i < 6; i++)
+		xyz[i] = Double.parseDouble(l[i]);
+	
+	setFEC(xyz);
+	
+	return 0;
+}
+
+public double[] getAngles3D(String wintitle) {
+		double angle[] = new double[2];
+		Arrays.fill(angle, 0);
+		
+		if (univ == null || univ.getContent(wintitle) == null)
+			return angle; // zero return
+
+		PointList pl = univ.getContent(wintitle).getPointList();
+		if (pl.size() < 2)
+			return angle;
+			
+		double[] xyz = new double[6];
+		for (int i = 0; i < 2; i++) {
+			BenesNamedPoint bnp = pl.get(i);
+			xyz[i * 3 + 0] = bnp.x; xyz[i * 3 + 1] = bnp.y; xyz[i * 3 + 2] = bnp.z;
+		}
+		
+		setFEC(xyz);
+		
+		Line l1 = new Line(xyz[0], xyz[1], xyz[3], xyz[4]);
+		angle[0] = l1.getAngle(); // Axial angle
+		
+		Line l2 = new Line(xyz[0], xyz[2], xyz[3], xyz[5]);
+		angle[1] = l2.getAngle(); // Coronal angle
+		
+		return angle;
+	}
+	
+	public int alignMPR() {	
+		String arg = getFECString();
+		
+		String ret = runKCAMacroS("KCA_alignMPR.ijm", arg);
+		
+		if (ret == null || ret.equals(""))
+			return error("alingMPR.ijm returned error.");
+		if (ret.equals("[aborted"))
+			return error("aborted alignMPR.", -2);
+	
+		String[] l = ret.split(" ");
+		
+		double xyz[] = new double[6];
+		for (int i = 0; i < 6; i++)
+			xyz[i] = Double.parseDouble(l[i]);
+		
+		setFEC(xyz);
+		
+		ImagePlus imp = WindowManager.getImage("Base");
+			
+		check3D();			
+		univ.removeAllContents();
+		Content c = add3D(imp, "Base");
+		
+		c.getPointList().add("MFEC", xyz[0], xyz[1], xyz[2]);
+		c.getPointList().add("LFEC", xyz[3], xyz[4], xyz[5]);
+		c.showPointList(true);
+			
+		return 0;
+	}
+	
+	
+}*/

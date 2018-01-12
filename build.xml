@@ -1,0 +1,31 @@
+<project name="KCA1" default="" basedir=".">
+	<description>
+		KneeCTAnalyzer build file
+	</description>
+	<property name="src" location="src" />
+	<property name="build" location="bin" />
+	<property name="dist" location="dist" />
+	<property name="resource" location="resource" />
+	
+		<property name="pluginsDir" location="$basedir/../../IJ/plugins/" />
+	
+	<property name="username" value="hoge" />
+<target name="main" depends="compress" description="Main Target">
+	<echo>
+		Building the .jar file
+	</echo>
+</target>
+<target name="compress" depends="" description="generate the distribution">
+	<jar jarfile="KneeCT_Analyzer.jar">
+		<fileset dir="." includes="plugins.config" />
+		<fileset dir="${build}" includes="**/*.*" />
+		<fileset dir="${resource}" includes="**/*.*" />
+		<manifest>
+			<attribute name="Build-By" value="${username}" />
+		</manifest>
+	</jar>
+	<copy file="KneeCT_Analyzer.jar" toDir="${pluginsDir}" />
+</target>
+</project>
+
+	
