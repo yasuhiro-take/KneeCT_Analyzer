@@ -2,6 +2,7 @@
 ImageJ PlugIn to analyze kneeCT for ACL reconstruction
 
 This is an ImageJ PlugIn that helps creating an alignment-corrected binary bone model and assists Quadrant-method analysis for tunnel locations in ACLR.
+
 Copyright (c) 2018 Yasuhiro Take
 
  This program is free software: you can redistribute it and/or modify
