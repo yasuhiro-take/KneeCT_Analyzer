@@ -18,3 +18,9 @@ Copyright (c) 2018 Yasuhiro Take
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
     
+--------------------------------
+
+The distribution includes several .class files from forms-1.3.0.jar in /resource/com folder, to have them in a single .jar file to dynamically loadable at the run-time. These are under the terms of condition of BSD license.
+
+The distribution also includes several icons files from Icons8 (http://icons8.com) under the license called Creative Commons Attribution-NoDerivs 3.0 Unported.
+
