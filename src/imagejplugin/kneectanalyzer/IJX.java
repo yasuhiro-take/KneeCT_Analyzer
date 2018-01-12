@@ -594,7 +594,7 @@ class mPointList {
 	}
 	
 	
-	public int size() {
+	public int size() { 
 		return list.size();
 	}
 	

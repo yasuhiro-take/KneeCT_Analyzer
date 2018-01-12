@@ -263,7 +263,6 @@ public class CreateModelsGUI {
 				}
 			});
 			frame.getGlassPane().setVisible(true);
-			frame.setAlwaysOnTop(true);
 		}
 		
 		@Override
@@ -380,7 +379,6 @@ public class CreateModelsGUI {
             for (MouseListener listener: listeners) {
                 frame.getGlassPane().removeMouseListener(listener);
             }
-			frame.setAlwaysOnTop(false);
 		}
 	}
 	

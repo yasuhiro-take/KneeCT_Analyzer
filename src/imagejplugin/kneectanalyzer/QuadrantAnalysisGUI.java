@@ -453,7 +453,6 @@ public class QuadrantAnalysisGUI {
 				}
 			});
 			frame.getGlassPane().setVisible(true);
-			frame.setAlwaysOnTop(true);
 		}
 		
 		@Override
@@ -556,7 +555,7 @@ public class QuadrantAnalysisGUI {
             for (MouseListener listener: listeners) {
                 frame.getGlassPane().removeMouseListener(listener);
             }
-            frame.setAlwaysOnTop(false);
+            
 		}
 	}
 	
