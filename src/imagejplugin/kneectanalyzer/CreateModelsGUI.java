@@ -31,7 +31,7 @@ import imagejplugin.kneectanalyzer.IJIF;
 public class CreateModelsGUI {
 	private static boolean opened;
 	
-	private String wintitle3D;
+	private String wintitle;
 	private JFrame frame;
 	private JButton btn_1, btn_2, btn_3, btn_4, btn_open, btn_save, btn_close;
 	private int status;
@@ -78,7 +78,7 @@ public class CreateModelsGUI {
 	 */
 	public CreateModelsGUI() {
 		status = 0;
-		wintitle3D = null;
+		wintitle = null;
 		IJIF.initIJIF();
 		
 		initialize();
@@ -287,21 +287,22 @@ public class CreateModelsGUI {
 				r = 0;
 				break;
 			case 'c':
-				r = IJIF.closeWorkingFiles(wintitle3D, "Base", "TibOnly", "FemOnly");
+				r = IJIF.closeWorkingFiles(wintitle, "Base", "TibOnly", "FemOnly");
 				break;
 			case '1':
-				r = IJIF.Modeler.binarize();
-				break;
-			case '2':
-				wintitle3D = IJIF3D.Modeler.determineFEC();
-				if (wintitle3D != null)
+				wintitle = IJIF.Modeler.binarize();
+				if (wintitle != null)
 					r = 0;
 				else
 					r = -1;
+				break;
+			case '2':
+				if (IJIF.has3D())
+					r = IJIF3D.Modeler.determineFEC(wintitle);
 				
 				break;
 			case '3':
-				r = IJIF.Modeler.align(wintitle3D);
+				r = IJIF.Modeler.align(wintitle);
 						
 				break;
 			case '4':
@@ -355,7 +356,7 @@ public class CreateModelsGUI {
 					break;
 				case 'c':
 					status = 0;
-					wintitle3D = null;
+					wintitle = null;
 					resetLabelIcons();
 					suggestion();
 					break;
@@ -406,6 +407,9 @@ public class CreateModelsGUI {
 		case 0:
 			
 			if (IJIF.isStack()) {
+				if (wintitle == null)
+					wintitle = IJIF.getCurrentWindowTitle();
+				
 				if (IJIF.isBin()) {
 					String msg = "Current image is Binary stack, ";
 					
@@ -484,6 +488,10 @@ public class CreateModelsGUI {
 		}
 		
 		frame.toFront();
+		if (wintitle != null)
+			frame.setTitle("Create Models" + " - " + wintitle);
+		else
+			frame.setTitle("Create Models");
 	}
 
 }
