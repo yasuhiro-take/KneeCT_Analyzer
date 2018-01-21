@@ -186,7 +186,7 @@ class QRoiList {
 		rt.show("Results");
 	}
 	
-	public Overlay toOverlay(ImagePlus imp, Overlay overlay) {
+	public Overlay toOverlay(Overlay overlay) {
 		
 		overlay.drawLabels(true);
 		overlay.drawNames(true);
@@ -201,9 +201,11 @@ class QRoiList {
 		return overlay;
 	}
 	
-	public Overlay toOverlay(ImagePlus imp) {
-		Overlay overlay = new Overlay();
-		return toOverlay(imp, overlay);
+	public void removeFromOverlay(Overlay overlay) {
+		for (QRoi r: qroiList) {
+			if (r.isAperture)
+				overlay.remove(r.roi);
+		}
 	}
 }
 
@@ -228,6 +230,7 @@ class Quadrant  {
 	private static final String FILENAME_TIBQ = "tibQuad.points";
 	private static final String FILENAME_FEMTUN = "femTun.points";
 	private static final String FILENAME_TIBTUN = "tibTun.points";
+	private static final String FILENAME_RESULTS = "tunnelCoords.txt";
 	
 	public static void init() {
 		systemCoordFem = null; systemCoordTib = null;
@@ -249,6 +252,29 @@ class Quadrant  {
 		return r;
 	}
 	
+	private static void drawOverlay(Overlay overlay, XY qxy[]) {
+			
+		for (double i = 0; i <= 1; i+= 0.25) {
+			int x1 = (int)(qxy[0].x + (qxy[1].x - qxy[0].x) * i);
+			int y1 = (int)(qxy[0].y + (qxy[1].y - qxy[0].y) * i);
+			int x2 = (int)(x1 + qxy[2].x - qxy[0].x);
+			int y2 = (int)(y1 + qxy[2].y - qxy[0].y);
+			
+			//cip.drawLine(x1, y1, x2, y2);
+			Line l = new Line(x1, y1, x2, y2); overlay.add(l);
+		}
+		
+		for (double i = 0; i <= 1; i+= 0.25) {
+			int x1 = (int)(qxy[0].x + (qxy[2].x - qxy[0].x) * i);
+			int y1 = (int)(qxy[0].y + (qxy[2].y - qxy[0].y) * i);
+			int x2 = (int)(x1 + qxy[1].x - qxy[0].x);
+			int y2 = (int)(y1 + qxy[1].y - qxy[0].y);
+			
+			//cip.drawLine(x1, y1, x2, y2);
+			Line l = new Line(x1, y1, x2, y2); overlay.add(l);
+		}
+	}
+	
 	private static void draw(ImageProcessor cip, Color c, XY qxy[]) {
 		cip.setLineWidth(1); cip.setColor(c);
 		
@@ -258,7 +284,8 @@ class Quadrant  {
 			int x2 = (int)(x1 + qxy[2].x - qxy[0].x);
 			int y2 = (int)(y1 + qxy[2].y - qxy[0].y);
 			
-			cip.drawLine(x1, y1, x2, y2);
+			//cip.drawLine(x1, y1, x2, y2);
+			Line l = new Line(x1, y1, x2, y2); l.drawPixels(cip);
 		}
 		
 		for (double i = 0; i <= 1; i+= 0.25) {
@@ -267,7 +294,8 @@ class Quadrant  {
 			int x2 = (int)(x1 + qxy[1].x - qxy[0].x);
 			int y2 = (int)(y1 + qxy[1].y - qxy[0].y);
 			
-			cip.drawLine(x1, y1, x2, y2);
+			//cip.drawLine(x1, y1, x2, y2);
+			Line l = new Line(x1, y1, x2, y2); l.drawPixels(cip);
 		}
 	}
 	
@@ -284,6 +312,17 @@ class Quadrant  {
 	private static void drawFem(ImageProcessor ip, Color c, Calibration cal) {
 		mPointList pl_px = systemCoordFem.clonePixelized(cal);
 		drawFem(ip, c, pl_px);
+	}
+	private static void drawFem(Overlay overlay, Color c, mPointList pl_px) {
+		XY qxy[] = new XY[3];
+		for (int i = 0; i < 3; i++) {
+			//qxy[i] = new XY();
+			//qxy[i].setFromPointYZ(pl_px.get(i));
+			qxy[i] = pl_px.get(i).getYZ();
+		}
+		
+		drawOverlay(overlay, qxy);
+		overlay.setStrokeColor(c);
 	}
 	
 	private static void drawTib(ImageProcessor ip, Color c, mPointList pl_px) {
@@ -392,8 +431,11 @@ class Quadrant  {
 		return ql;
 	}
 	
-	private static void outputTunnels2D(ImagePlus imp, Overlay overlay, QRoiList ql) {
-		overlay = (overlay == null) ? ql.toOverlay(imp) : ql.toOverlay(imp, overlay);
+	private static void outputTunnels2D(ImagePlus imp, QRoiList ql) {
+		Overlay overlay = imp.getOverlay();
+		if (overlay == null) overlay = new Overlay();
+		
+		ql.toOverlay(overlay);
 		
 		overlay.setFillColor(new Color(0,255,255));
 		imp.setOverlay(overlay);
@@ -553,7 +595,10 @@ class Quadrant  {
 		mPointList femQpl = getSystemCoordFem(pl);
 		correctHL100(impSagM, femQpl);
 		
-		drawFem(cf.impWork.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
+		Overlay ol = new Overlay();
+		//drawFem(cf.impWork.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
+		drawFem(ol, new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
+		cf.impWork.setOverlay(ol);
 		cf.impWork.updateAndDraw();
 		
 		IJX.rename(cf.impWork, Quadrant.WINTITLE_FEM2D);
@@ -695,7 +740,10 @@ class Quadrant  {
 		//PointList femQpl = IJX.Util.real2px(systemCoordFem, impFem.getCalibration());
 		mPointList femQpl = systemCoordFem.clonePixelized(impFem.getCalibration());
 		
-		drawFem(impSagZ.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
+		//drawFem(impSagZ.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
+		Overlay ol = new Overlay();
+		drawFem(ol, new Color(0,255,0), femQpl);
+		impSagZ.setOverlay(ol);
 		IJX.rename(impSagZ, WINTITLE_FEM2D);
 		impSagZ.show();
 		
@@ -754,7 +802,7 @@ class Quadrant  {
 		
 		ImagePlus imp2D = get2DImage(FEM, true, nrx);
 		
-		outputTunnels2D(imp2D, null, tunnelRoisFem);
+		outputTunnels2D(imp2D, tunnelRoisFem);
 		tunnelRoisFem.toResults(imp2D);
 				
 		return 0;
@@ -777,7 +825,7 @@ class Quadrant  {
 		
 		ImagePlus imp2D = get2DImage(TIB, true, 0);
 		
-		outputTunnels2D(imp2D, null, tunnelRoisTib);
+		outputTunnels2D(imp2D, tunnelRoisTib);
 		tunnelRoisTib.toResults(imp2D);
 		
 		return 0;
@@ -799,12 +847,12 @@ class Quadrant  {
 				
 				if (label.matches(WINTITLE_FEM2D+":[0-9]+")) {
 					int apID = IJX.Util.string2int(label, ":", 1);
-					QRoi qroi = tunnelRoisFem.findAperture(apID);
+					QRoi qroi = (tunnelRoisFem != null) ? tunnelRoisFem.findAperture(apID) : null;
 
-					z = qroi.z * calBase.pixelWidth;
+					z = (qroi != null) ? qroi.z * calBase.pixelWidth : 0;
 				} else {
-					QRoi qroi = tunnelRoisFem.findAperture(centroid, calFem2D);
-					z = qroi.z * calBase.pixelWidth;
+					QRoi qroi = (tunnelRoisFem != null) ? tunnelRoisFem.findAperture(centroid, calFem2D) : null;
+					z = (qroi != null) ? qroi.z * calBase.pixelWidth : 0;
 				}
 				
 			} else if (label.indexOf(Quadrant.WINTITLE_TIB2D) == 0 && Quadrant.systemCoordTib != null) {
@@ -814,10 +862,10 @@ class Quadrant  {
 					int apID = IJX.Util.string2int(label, ":", 1);
 					QRoi qroi = tunnelRoisTib.findAperture(apID);
 
-					z = qroi.z * calBase.pixelDepth;
+					z = (qroi != null) ? qroi.z * calBase.pixelDepth : 0;
 				} else {
 					QRoi qroi = tunnelRoisTib.findAperture(centroid, calBase);
-					z = qroi.z * calBase.pixelDepth;
+					z = (qroi != null) ? qroi.z * calBase.pixelDepth : 0;
 				}
 					
 			}
@@ -825,7 +873,8 @@ class Quadrant  {
 			if (quad != null) {
 				rt.setValue("QuadX", i, quad.x);
 				rt.setValue("QuadY", i, quad.y);
-				rt.setValue("Z", i, z);
+				if (z != 0)
+					rt.setValue("Z", i, z);
 			}
 		}
 	}
@@ -840,20 +889,24 @@ class Quadrant  {
 	public static void syncWithResults() {
 		ImagePlus impFem = WindowManager.getImage(WINTITLE_FEM2D);
 		ImagePlus impTib = WindowManager.getImage(WINTITLE_TIB2D);
-		if (impFem != null && impFem.getOverlay() != null)
-			impFem.getOverlay().clear();
+		if (impFem != null && impFem.getOverlay() != null && tunnelRoisFem != null)
+			tunnelRoisFem.removeFromOverlay(impFem.getOverlay());
 		if (impTib != null && impTib.getOverlay() != null)
 			impTib.getOverlay().clear();
 		
-		if (tunnelRoisFem != null)
+		if (tunnelRoisFem != null) {
 			tunnelRoisFem.sync(WINTITLE_FEM2D, ResultsTable.getResultsTable());
-		if (tunnelRoisTib != null)
+			IJX.forceClose("TunOnlyFem");
+		}
+		if (tunnelRoisTib != null) {
 			tunnelRoisTib.sync(WINTITLE_TIB2D, ResultsTable.getResultsTable());
+			IJX.forceClose("TunOnlyTib");
+		}
 		
 		if (impFem != null)
-			outputTunnels2D(impFem, impFem.getOverlay(), tunnelRoisFem);
+			outputTunnels2D(impFem, tunnelRoisFem);
 		if (impTib != null)
-			outputTunnels2D(impTib, impTib.getOverlay(), tunnelRoisTib);
+			outputTunnels2D(impTib, tunnelRoisTib);
 	}
 	
 	
@@ -887,6 +940,11 @@ class Quadrant  {
 		imp = get2DImage(TIB, false, 0);
 		if (imp != null && imp.getProcessor() != null)
 			IJX.savePNG(imp, basepath, WINTITLE_TIB2D);
+		
+		ResultsTable rt = Analyzer.getResultsTable();
+		if (rt.size() > 0)
+			rt.save(IJX.Util.createPath(basepath, FILENAME_RESULTS));
+		
 	}
 }
 
