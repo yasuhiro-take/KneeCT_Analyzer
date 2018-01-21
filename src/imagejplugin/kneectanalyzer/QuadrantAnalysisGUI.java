@@ -44,10 +44,11 @@ public class QuadrantAnalysisGUI {
 	private JToggleButton tbtn1, tbtn2;
 	
 	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results" };
-	private String[] btntitles3D = { "3D View (Bone Only)", "Manual-set Quadrant System", "3D View (Bone + Tunnel)", "Refresh Results" };
+	private String[] btntitles3D = { "3D Viewer", "Manual-set Quadrant System", "Refresh Results", "Snapshot" };
 	private static ImageIcon icons[];
 	private static String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
 	private static int mode2D3D = 1;
+	private static String basePathLast;
 	
 	/**
 	 * Launch the application.
@@ -83,6 +84,7 @@ public class QuadrantAnalysisGUI {
 	 */
 	public QuadrantAnalysisGUI() {
 		status = 0;
+		basePathLast = null;
 		IJIF.initIJIF();
 		
 		initialize();
@@ -327,6 +329,10 @@ public class QuadrantAnalysisGUI {
 		}
 		
 		frame.toFront();
+		
+		String title = "Quadrant Analysis";
+		if (basePathLast != null) title += " - " + basePathLast;
+		frame.setTitle(title);
 	}
 	
 	void suggestion3D(int ret) {
@@ -373,6 +379,12 @@ public class QuadrantAnalysisGUI {
 			break;
 		} 
 		}
+		
+		frame.toFront();
+		
+		String title = "Quadrant Analysis";
+		if (basePathLast != null) title += " - " + basePathLast;
+		frame.setTitle(title);
 	}
 	
 	
@@ -463,6 +475,9 @@ public class QuadrantAnalysisGUI {
 			switch(btn) {
 			case 'o':
 				r = IJIF.openKCADirectory("TibOnly", "FemOnly");
+				if (r > 0)
+					basePathLast = IJX.Util.getLastDirectory(IJIF.getBaseDirectory());
+				
 				break;
 			case 's':
 				r = IJIF.Quad.saveData(mode2D3D);
@@ -470,18 +485,20 @@ public class QuadrantAnalysisGUI {
 			case 'c':
 				r = IJIF.closeWorkingFiles("Base", "TibOnly", "FemOnly", "LFCOnly", "FemoralQuadrant", 
 											"TibialQuadrant", "TunOnlyFem", "TunOnlyTib");
+				basePathLast = null;
+				
 				break;
 			case '1':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D(false);
+				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D();
 				break;
 			case '2':
 				r = -1;
 				break;
 			case '3':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() : IJIF3D.Quad.view3D(true);		
+				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
 				break;
 			case '4':
-				r = (mode2D3D == 1) ? IJIF.Quad.refreshResults2D() : IJIF3D.Quad.refreshResults3D();
+				r = (mode2D3D == 1) ? IJIF.Quad.refreshResults2D() : IJIF3D.Quad.snapshot();
 				break;
 			} 
 			
