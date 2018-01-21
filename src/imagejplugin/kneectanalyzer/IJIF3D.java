@@ -1,17 +1,24 @@
 package imagejplugin.kneectanalyzer;
 
+import java.awt.Scrollbar;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Vector;
 
 import javax.media.j3d.View;
 import javax.vecmath.Color3f;
+import javax.vecmath.Point3d;
 
 import vib.BenesNamedPoint;
 import vib.PointList;
 import vib.PointList.PointListListener;
 import ij.ImagePlus;
 import ij.WindowManager;
+import ij.gui.GenericDialog;
 import ij.gui.Roi;
 import ij.measure.ResultsTable;
+import ij.plugin.ImageCalculator;
 import ij.plugin.filter.Analyzer;
 import ij3d.Content;
 import ij3d.DefaultUniverse;
@@ -23,40 +30,90 @@ import ij3d.behaviors.Picker;
 
 public class IJIF3D {
 	public static Image3DUniverse univ;
+	public static ArrayList<String> contentNames;
+	private static ResultsTable rt3d;
 	private static final int IJ3D_WINSIZE = 512;
 	
+	private static final String CONTENT_BONES[] = { null, "Fem", "Tib", "FemTib" };
+	
+	private static float transparency;
+	private static int lastShowFlag; 
+	
 	public static Image3DUniverse open3D() {
-		// TODO: classloader, catch exception...
 		if (IJIF.ij3d == true && univ == null) {
 			univ = new Image3DUniverse(IJ3D_WINSIZE, IJ3D_WINSIZE);
 			univ.show();
 			univ.addUniverseListener(new IJIFUnivListener());
 			univ.addInteractiveBehavior(new IJIFBehavior(univ));
+			contentNames = new ArrayList<String>();
+			
 			return univ;
 		}
 		return univ;
 	}
 	
-	public static Content add3D(Image3DUniverse u, ImagePlus grey, String wintitle) {
+	public static Content add3D(ImagePlus grey, String wintitle) {
 		Color3f color = new Color3f(1f, 1f, 1f);
-		return add3D(u, grey, wintitle, color);
+		return add3D(grey, wintitle, color);
 	}
-	public static Content add3D(Image3DUniverse u, ImagePlus grey, Color3f color) {
-		return add3D(u, grey, grey.getTitle(), color);
+	public static Content add3D(ImagePlus grey, Color3f color) {
+		return add3D(grey, grey.getTitle(), color);
 	}
-	public static Content add3D(Image3DUniverse u, ImagePlus grey) {
+	public static Content add3D(ImagePlus grey) {
 		Color3f color = new Color3f(1f, 1f, 1f);
-		return add3D(u, grey, grey.getTitle(), color);
+		return add3D(grey, grey.getTitle(), color);
 	}
 	
-	public static Content add3D(Image3DUniverse univ, ImagePlus grey, String wintitle, Color3f color) {
+	public static Content add3D(ImagePlus grey, String name, Color3f color) {
 		boolean[] channels = new boolean[]{ true, true, true };
 		
-		//Content c = univ.addContent(grey, color, wintitle, 50, channels, 2, 2);
-		Content c = univ.addMesh(grey, color, wintitle, 50, channels, 2);
-		//c.showBoundingBox(true);
+		Content c;
+		
+		if ((c = univ.getContent(name)) != null) {
+			String contentWintitle = c.getImage().getTitle();
+			if (contentWintitle.startsWith(grey.getTitle())) {
+				c.setVisible(true);
+				
+				if (!contentNames.contains(name))
+					contentNames.add(name);
+				
+				return c;
+			} else {
+				univ.removeContent(name);
+			}
+		}
+		
+		c = univ.addMesh(grey, color, name, 50, channels, 2);
+		
+		if (c != null && !contentNames.contains(name))
+			contentNames.add(name);
 		
 		return c;
+	}
+	
+	public static void close() {
+		if (univ != null)
+			univ.cleanup();
+		univ = null;
+		contentNames = null;
+	}
+	
+	public static void hideAllContents() {
+		if (univ != null && contentNames != null) {
+			for (String name: contentNames) {
+				Content c = univ.getContent(name);
+				if (c != null)
+					c.setVisible(false);
+			}
+		}
+	}
+	
+	public static void removeAllContents() {
+		if (univ != null && contentNames != null) {
+			for (String name: contentNames) {
+				univ.removeContent(name);
+			}
+		}
 	}
 	
 	private static mPointList convertPLtoMy(PointList pl) {
@@ -80,7 +137,7 @@ public class IJIF3D {
 		return pl;
 	}
 	
-	static XY getRoiCentroid3D() {
+	static XY get3DRoiCentroid() {
 		ImageCanvas3D canvas = (ImageCanvas3D)univ.getCanvas();
 		Roi roi = canvas.getRoi();
 		if (roi != null) {
@@ -93,33 +150,204 @@ public class IJIF3D {
 		return null;
 	}
 	
-	static void addPointByRoi() {
-		XY centroid = getRoiCentroid3D();
-		if (centroid != null) {
-			int x = (int)centroid.x, y = (int)centroid.y;
+	static void addPoint(XY xyPx) {
+		if (xyPx != null) {
+			int x = (int)xyPx.x, y = (int)xyPx.y;
 				
 			Picker picker = univ.getPicker();
 			Content c = picker.getPickedContent(x, y);
 				
 			if (c != null) {
-				picker.addPoint(c, x, y);
+				Point3d pnt = picker.getPickPointGeometry(c, x, y);
+				float tol = c.getLandmarkPointSize();
+				PointList pl = c.getPointList();
+				if (pl.pointAt(pnt.x, pnt.y, pnt.z, tol) == null)
+					pl.add(pnt.x, pnt.y, pnt.z);
+				
+				//picker.addPoint(c, x, y);
 				c.showPointList(true);
 			}
 		} 
 	}
 	
+	static class Dialog {
+		private static final String WINTITLES_BONE[] = { "FemOnly", "LFCOnly", "TibOnly" };
+		private static final int BONEINDEX2FT[] = { 1, 1, 2 };
+		private static final String WINTITLES_TUNNEL[] = { "TunOnlyFem", "TunOnlyTib", "TunOnlyBoth" };
+		
+		private static final int FEMONLY=1, LFCONLY=2, TIBONLY=4, TUNONLYFEM=8,TUNONLYTIB=16;
+		private static final int FLAGS[] = { FEMONLY, LFCONLY, TIBONLY, TUNONLYFEM, TUNONLYTIB };
+		
+		private static int flag2ft(int flag) {
+			int ret = 0;
+			if ((flag & (FEMONLY | LFCONLY)) != 0) ret |= 1;
+			if ((flag & TIBONLY) != 0) ret |= 2;
+			return ret;
+		}
+	
+		private static boolean addMisc(GenericDialog gd) {
+			gd.addSlider("Transparency", 0, 100, 100);
+			
+			boolean hasTun = (Quadrant.tunnelDetermined() != 0);
+			if (hasTun) {
+				Content cTun = univ.getContent("Tun"); 
+				boolean tun3D = (cTun != null && cTun.isVisible());
+				gd.addCheckbox("Add Tunnel(s)", tun3D);
+			}
+			
+			//TODO: grafts...
+			
+			return hasTun;
+		}
+		
+		private static int getMisc(GenericDialog gd, boolean hasTun, int ftNew) {
+			Vector<Scrollbar> slider = gd.getSliders();
+			transparency = slider.get(0).getValue();
+			
+			int ret = 0;
+			if (hasTun)
+				if (gd.getNextBoolean())
+					switch (ftNew) {
+					case 1: ret = TUNONLYFEM; break;
+					case 2: ret = TUNONLYTIB; break;
+					case 3: ret = TUNONLYFEM | TUNONLYTIB; break;
+					}
+			
+			return ret;
+		}
+		
+		private static int oneBone(String title, String msg) {
+			if (univ == null) return 0;
+			
+			int ft = 0; 
+			if ((univ.getContent("Fem")) != null) ft |= 1;
+			if ((univ.getContent("Tib")) != null) ft |= 2;
+			
+			if (ft == 3 || ft == 0) ft = 1;
+			
+			GenericDialog gd = new GenericDialog(title);
+			gd.addMessage(msg);
+			
+			String bonetitles[] = new String[] { WINTITLES_BONE[1], WINTITLES_BONE[2] };
+			gd.addRadioButtonGroup("Bone model to show", bonetitles, 2, 1, bonetitles[ft - 1]);
+			boolean hasTun = addMisc(gd);
+			
+			gd.showDialog();
+			if (!gd.wasOKed()) return 0;
+			
+			int ftNew = 0, flag = 0;
+			String ftStr = gd.getNextRadioButton();
+			ftNew = (ftStr == bonetitles[0]) ? 1:2;
+			flag = FLAGS[ftNew];
+			
+			flag |= getMisc(gd, hasTun, ftNew);
+			
+			return flag;
+		}
+			
+		private static int multiBones(String title, String msg) {
+			if (univ == null) return 0;
+			
+			int ft = 0; Content cFem, cTib;
+			if ((cFem = univ.getContent("Fem")) != null) ft |= 1;
+			if ((cTib = univ.getContent("Tib")) != null) ft |= 2;
+			
+			GenericDialog gd = new GenericDialog(title);
+			gd.addMessage(msg);
+			
+			boolean defaults[] = new boolean[WINTITLES_BONE.length];
+				
+			String femtitle = ((ft & 1) != 0 && cFem.isVisible()) ? cFem.getImage().getTitle() : null;
+			String tibtitle = ((ft & 2) != 0 && cTib.isVisible()) ? cTib.getImage().getTitle() : null;
+				
+			for (int i = 0; i < WINTITLES_BONE.length; i++) {
+				defaults[i] = false;
+				if (femtitle != null && WINTITLES_BONE[i].equals(femtitle)) defaults[i] = true;
+				if (tibtitle != null && WINTITLES_BONE[i].equals(tibtitle)) defaults[i] = true;
+			}	
+			
+			String labels[] = new String[] { "Bone model to show" };
+			gd.addCheckboxGroup(WINTITLES_BONE.length, 1, WINTITLES_BONE, defaults, labels);
+			
+			boolean hasTun = addMisc(gd);
+			
+			gd.showDialog();
+			if (!gd.wasOKed()) return 0;
+			
+			int ftNew = 0, flag = 0; 
+			for (int i = 0; i < WINTITLES_BONE.length; i++)
+				if (gd.getNextBoolean()) {
+					flag |= FLAGS[i];
+					ftNew |= BONEINDEX2FT[i];
+				}
+			
+			flag |= getMisc(gd, hasTun, ftNew);
+			
+			return flag;
+		}
+		
+		static ImagePlus[] flag2imp(int flag) {
+			ImagePlus[] imp = new ImagePlus[3]; // 0..fem, 1..tib, 2..tun; 3..grafts...
+			
+			if ((flag & LFCONLY) != 0) {
+				if ((imp[0] = WindowManager.getImage("LFCOnly")) == null)
+					imp[0] = IJX.createLFCOnly(IJIF.notchRoofX);
+			} else if ((flag & FEMONLY) != 0) {
+				if ((imp[0] = WindowManager.getImage("FemOnly")) == null)
+					return null;
+			}
+			if ((flag & TIBONLY) != 0) {
+				if ((imp[1] = WindowManager.getImage("TibOnly")) == null)
+					return null;
+			}
+			
+			ImagePlus tunFem, tunTib; tunFem = tunTib = null;
+			if ((flag & TUNONLYFEM) != 0) {
+				if ((tunFem = WindowManager.getImage("TunOnlyFem")) == null) {
+					IJIF.notice("creating tunnel model...This takes some moments.");
+					tunFem = IJX.createTunOnlyFem(imp[0], Quadrant.tunnelRoisFem);
+				}
+				imp[2] = tunFem;
+			}
+			if ((flag & TUNONLYTIB) != 0) {
+				if ((tunTib = WindowManager.getImage("TunOnlyTib")) == null)
+					tunTib = IJX.createTunOnlyTib(imp[1], Quadrant.tunnelRoisTib);
+				imp[2] = tunTib;
+			}
+			if (tunFem != null && tunTib != null) {
+				if ((imp[2] = WindowManager.getImage("TunOnlyBoth")) == null) {
+					ImageCalculator ic = new ImageCalculator();
+				
+					imp[2] = ic.run("OR create stack", tunFem, tunTib);
+					IJX.rename(imp[2], "TunOnlyBoth");
+				}
+			}
+			
+			return imp;
+		}
+		
+		public static String flag2string(int flag) {
+			int ft = flag2ft(flag);
+			String ret = CONTENT_BONES[ft];
+			
+			if ((flag & (TUNONLYFEM | TUNONLYTIB)) != 0)
+				ret += "+Tun";
+			
+			return ret;
+		}
+	}
+	
 	static class Modeler {		
-		public static String determineFEC() {
+		public static int determineFEC(String wintitle) {
 			if (IJIF3D.open3D() == null)
-				return null;
+				return -1;
 		
 		//GUI.center(univ.getWindow());
 		
-			ImagePlus grey = WindowManager.getCurrentImage();
-			String wintitle = grey.getTitle();
+			ImagePlus grey = WindowManager.getImage(wintitle);
 		
 			IJIF.notice("creating 3D surface rendered model...This takes some moments.");
-			Content c = add3D(univ, grey, wintitle);
+			Content c = add3D(grey, wintitle);
 		
 		/*
 		IJIFPointListListener pll = new IJIFPointListListener();
@@ -137,12 +365,12 @@ public class IJIF3D {
 			} while (c != null && univ != null && c.getPointList().size() < 2);
 		
 			if (c == null) // 3D-window closed, or object removed
-				return null;
+				return -1;
 		//if (pll.pointNum < 2 || c.getPointList().size() < 2) return null;
 			
 			IJIF.setFEC(convertPLtoMy(c.getPointList()));
 		
-			return wintitle;
+			return -1;
 		}
 		
 		public static void updateFEC(String wintitle) {
@@ -154,8 +382,8 @@ public class IJIF3D {
 		}
 		
 		public static void showModelAndPoints(ImagePlus imp, mPointList pl) {
-			univ.removeAllContents();
-			Content c = add3D(univ, imp, imp.getTitle());
+			removeAllContents();
+			Content c = add3D(imp, imp.getTitle());
 			
 			for (int i = 0; i < pl.size(); i++)
 				c.getPointList().add(pl.get(i).name, pl.get(i).x, pl.get(i).y, pl.get(i).z);
@@ -164,76 +392,33 @@ public class IJIF3D {
 	}
 	
 	static class Quad {
-		private static final String CONTENTNAMES[] = new String[] { null, "Fem", "Tib", "Fem+Tib" };
+		private static final String FILENAME_RESULTS3D = "tunnelCoords3D.txt";
 		
-		public static int view3D(boolean tunnel) {
+		public static int view3D() {
 			if (open3D() == null)
 				return IJX.error("3D Viewer not available.", -1);
 			
-			univ.removeAllContents();
+			hideAllContents();
+			int showFlag = Dialog.oneBone("Choice", "Select below for 3D model to create.");
+			if (showFlag == 0) return -1;
+			lastShowFlag = showFlag;
 			
-			int ft = IJIF.radiobuttonFTDialog("Choice", "Select below for 3D model to create.", "Bone (+ Tunnel)"); 
-			if (ft == 0) return -1;
-			
-			ImagePlus impBone, impTun = null;
-			if (ft == 1) {
-				impBone = WindowManager.getImage("LFCOnly");
-				if (impBone == null)
-					impBone = IJX.createLFCOnly(WindowManager.getImage("FemOnly"), IJIF.notchRoofX);
-				impBone.show();
-				
-				if (tunnel && Quadrant.tunnelRoisFem != null) {
-					impTun = WindowManager.getImage("TunOnlyFem");
-					if (impTun == null) {
-						IJIF.notice("creating tunnel model...This takes some moments.");
-						ImagePlus impSag = IJX.createAx2Sag(impBone);
-						IJIF.convertTunOnly(impSag, Quadrant.tunnelRoisFem);
-						impTun = IJX.createSag2Ax(impSag);
-						IJX.rename(impTun, "TunOnlyFem");
-						IJX.forceClose(impSag);
-					}
-				}
-				//pl = IJX.createPointListfromResults(Quadrant.WINTITLE_FEM2D, "Z", "X", "Y");
-			} else if (ft == 2) {
-				impBone = WindowManager.getImage("TibOnly");
-				
-				if (tunnel && Quadrant.tunnelRoisTib != null) {
-					impTun = WindowManager.getImage("TunOnlyTib");
-					if (impTun == null) {
-						impTun = impBone.duplicate();
-						impTun.show();
-						IJIF.convertTunOnly(impTun, Quadrant.tunnelRoisTib);
-						IJX.rename(impTun, "TunOnlyTib");
-					}
-				}
-				//pl = IJX.createPointListfromResults(Quadrant.WINTITLE_TIB2D, "X", "Y", "Z");
-			} else return -1;
+			int ft = Dialog.flag2ft(showFlag);
+			ImagePlus imps[] = Dialog.flag2imp(showFlag);
+			if (imps == null) return -1;
 			
 			IJIF.notice("creating 3D surface rendered model...This takes some moments.");
 			
-			Content c = add3D(univ, impBone, CONTENTNAMES[ft]);
+			add3D(imps[ft - 1], CONTENT_BONES[ft]);
 			
-			if (tunnel) {
-				if (impTun != null)
-					c = add3D(univ, impTun, "Tun", new Color3f(1f,0,0));
+			if (imps[2] != null)
+				add3D(imps[2], "Tun", new Color3f(1f,0,0));
 			
-				/*
-				if (pl != null) {
-					for (int i = 0; i < pl.size(); i++)
-						c.getPointList().add(pl.get(i).name, pl.get(i).x, pl.get(i).y, pl.get(i).z);
-					c.showPointList(true);
-					c.setLandmarkPointSize(1);
-				}
-				*/
-			}
+			univ.resetView();
 			
 			if (ft == 1)
 				univ.rotateToPositiveXZ();
-			/*
-			ImagePlus imp2D = univ.takeSnapshot(IJ3D_WINSIZE, IJ3D_WINSIZE);
-			imp2D.show();
-			IJX.rename(imp2D, Quadrant.WINTITLES3D[ft]);
-			*/
+			
 			return 0;
 		}
 		
@@ -248,12 +433,15 @@ public class IJIF3D {
 			
 			if (ft == 0 || ft == 3) return -1;
 			
-			addPointByRoi();
+			addPoint(get3DRoiCentroid());
 			
 			PointList plTun = (cTun != null) ? cTun.getPointList() : null;
 			PointList pl = sumOfPointList(cBones[ft].getPointList(), plTun);
 			
-			ResultsTable rt = new ResultsTable();
+			if (rt3d == null)
+				rt3d = new ResultsTable();
+			else
+				rt3d.reset();
 			
 			for (int i = 0; i < pl.size(); i++) {
 				double x, y, z;
@@ -267,17 +455,52 @@ public class IJIF3D {
 					z = pl.get(i).z;
 				}
 				
-				rt.incrementCounter();
-				rt.addLabel(Quadrant.WINTITLES[ft]);
-				rt.addValue("X", x);
-				rt.addValue("Y", y);
-				rt.addValue("Z", z);	
+				rt3d.incrementCounter();
+				rt3d.addLabel(Quadrant.WINTITLES3D[ft]);
+				rt3d.addValue("X", x);
+				rt3d.addValue("Y", y);
+				rt3d.addValue("Z", z);	
 			}
 			
-			Quadrant.measurements2Coord(rt);
+			Quadrant.measurements2Coord(rt3d);
 			
 			//rt.updateResults();
-			rt.show("Results3D");
+			rt3d.show("Results3D");
+			
+			return 0;
+		}
+		
+		public static int snapshot() {
+			if (univ == null) return -1;
+			
+			ImagePlus imp3D = univ.takeSnapshot(IJ3D_WINSIZE, IJ3D_WINSIZE);
+			
+			String fname = "3D-" + Dialog.flag2string(lastShowFlag);
+			String basepath = IJIF.getBaseDirectory();
+			if (basepath == null)
+				return -1;
+			
+			int cnt = 1;
+			while (IJX.Util.doesFileExist(basepath, fname + ".png") ||
+					WindowManager.getImage(fname) != null) {
+				fname += "-" + cnt++;
+			}
+			
+			IJX.rename(imp3D, fname);
+			imp3D.show();
+			
+			return 0;
+		}
+		
+		public static int save(String basepath) {
+			if (rt3d != null && rt3d.size() > 0)
+				rt3d.save(IJX.Util.createPath(basepath, FILENAME_RESULTS3D));
+			
+			String snapshots[] = IJX.getWindowTitles("3D-.*");
+			
+			if (snapshots != null)
+				for (String win: snapshots)
+					IJX.savePNG(WindowManager.getImage(win), basepath, win);
 			
 			return 0;
 		}
@@ -297,7 +520,7 @@ class IJIFBehavior extends InteractiveBehavior {
 		char code = e.getKeyChar();
 		
 		if (id == KeyEvent.KEY_TYPED && code == 'm')
-			IJIF3D.addPointByRoi();
+			IJIF3D.addPoint(IJIF3D.get3DRoiCentroid());
 	}
 }
 
@@ -326,6 +549,7 @@ class IJIFUnivListener implements UniverseListener {
 	
 	@Override	public void universeClosed() {
 		IJIF3D.univ = null;
+		IJIF3D.contentNames = null;
 	}
 	
 }
