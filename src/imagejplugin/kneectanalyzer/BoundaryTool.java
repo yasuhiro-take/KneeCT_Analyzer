@@ -436,7 +436,10 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 	public void scanDistalTibia() {
 		BoundaryData bdatM = findProximal(BoundaryData.MFC);
 		BoundaryData bdatL = findProximal(BoundaryData.LFC);
-		double areaLFMC = bdatM.w * bdatM.h + bdatL.w * bdatL.h;
+		double FCw = (bdatL.x + bdatL.w - bdatM.x);
+		double FCh = Math.max(bdatM.y + bdatM.h, bdatL.y + bdatL.h) - Math.min(bdatM.y,  bdatL.y);
+		double areaLFMC = FCw * FCh;
+		//double areaLFMC = bdatM.w * bdatM.h + bdatL.w * bdatL.h;
 		
 		BoundaryData bdatT = findDistal(BoundaryData.TIB);
 		int z0 = bdatT.z + 1;
