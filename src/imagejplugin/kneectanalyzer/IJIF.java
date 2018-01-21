@@ -1,25 +1,33 @@
 package imagejplugin.kneectanalyzer;
 
-import javax.swing.SwingWorker;
-
-import ij.*;
-import ij.io.*;
-import ij.process.*;
-import ij.measure.*;
-import ij.gui.*;
-
-import java.awt.*;
-import java.util.Arrays;
-import java.util.Vector;
-
+import ij.IJ;
+import ij.ImagePlus;
+import ij.ImageStack;
+import ij.WindowManager;
+import ij.gui.DialogListener;
+import ij.gui.GenericDialog;
+import ij.io.DirectoryChooser;
+import ij.io.FileInfo;
+import ij.measure.Calibration;
+import ij.measure.Measurements;
+import ij.measure.ResultsTable;
 import ij.plugin.ImageCalculator;
 import ij.plugin.filter.Analyzer;
 import ij.plugin.filter.ExtendedPlugInFilter;
 import ij.plugin.filter.MaximumFinder;
 import ij.plugin.filter.ParticleAnalyzer;
 import ij.plugin.filter.PlugInFilterRunner;
+import ij.process.ByteProcessor;
+import ij.process.ImageProcessor;
+import ij.text.TextWindow;
 
-//import imagejplugin.kneectanalyzer.BoundaryTool;
+import java.awt.AWTEvent;
+import java.awt.Scrollbar;
+import java.util.Arrays;
+import java.util.Vector;
+
+import javax.swing.SwingWorker;
+
 
 public class IJIF implements Measurements {
 	public static boolean ij3d = false;
@@ -36,7 +44,6 @@ public class IJIF implements Measurements {
 	private static boolean initializedFlag;
 	
 	private static final String FILENAME_FEC = "fec.points";
-	private static final String FILENAME_RESULTS = "tunnelCoords.txt";
 	
 	private static final String MD_THRESHOLD = "Threshold";
 	
@@ -174,7 +181,7 @@ public class IJIF implements Measurements {
 		return openDirectoryDialog(title, null);
 	}
 	
-	private static String getBaseDirectory() {
+	public static String getBaseDirectory() {
 		ImagePlus imp = WindowManager.getImage("Base");
 		FileInfo finfo = (imp != null) ? imp.getOriginalFileInfo() : null;
 		String basepath = (finfo != null) ? finfo.directory : null;
@@ -301,6 +308,7 @@ public class IJIF implements Measurements {
 		int[] slices = getMaximaParticleSlices(b_area);
 		
 		SliceChooseFilter scf = new SliceChooseFilter(slices);
+		imp.getWindow().toFront();
 		WindowManager.setCurrentWindow(imp.getWindow());
 		new PlugInFilterRunner(scf, null, null);
 		
@@ -422,19 +430,6 @@ public class IJIF implements Measurements {
 		return impFem;
 	}
 	
-	public static void convertTunOnly(ImagePlus imp, QRoiList ql) {
-		IJ.setForegroundColor(128, 128, 128);
-		for (QRoi qroi: ql.qroiList) {
-			imp.setSliceWithoutUpdate(qroi.z + 1);
-			imp.getProcessor().fill(qroi.roi);
-		}
-		
-		imp.updateAndDraw();
-		
-		IJ.setThreshold(imp, 127, 128);
-		IJ.run(imp, "Make Binary", "method=Default background=Default");
-	}
-	
 	private static boolean[] generalFTDialog(String title, String msg, String suffix, boolean f, boolean t, boolean[] defaultvalue) {
 		if (f == false && t == false)
 			return null;
@@ -541,232 +536,246 @@ public class IJIF implements Measurements {
 		IJIF.bdatList = null;
 		IJIF.notchRoofX = 0;
 		
-		ImagePlus imp;
 		for (String win: wintitles) 
-			if ((imp = WindowManager.getImage(win)) != null)
-				IJX.forceClose(imp);
-		
+			IJX.forceClose(win);
 		
 		String workwins[] = IJX.getWindowTitles("KCAwork-.*");
 		if (workwins != null)
 			for (String win: workwins)
-				if ((imp = WindowManager.getImage(win)) != null)
-					IJX.forceClose(imp);
-			
-
-		if (IJIF.fec != null)
-			IJIF.fec.clear();
-		if (IJIF.bdatList != null)
-			IJIF.bdatList.clear();
+				IJX.forceClose(win);
+		
+		workwins = IJX.getWindowTitles("3D-.*");
+		if (workwins != null)
+			for (String win: workwins)
+				IJX.forceClose(win);
+		
+		if (IJ.isResultsWindow())
+			ResultsTable.getResultsWindow().close(false);
+		
+		java.awt.Window win = WindowManager.getWindow("Results3D");
+		if (win != null && win instanceof TextWindow)
+			((TextWindow)win).close(false);
+		
+		if (ij3d)
+			IJIF3D.close();
 		
 		Quadrant.init();
 		
 		return 0;
 	}
 	
+	public static String getCurrentWindowTitle() {
+		ImagePlus imp = WindowManager.getCurrentImage();
+		return (imp != null) ? imp.getTitle() : null;
+	}
+	
 	static class Modeler {
-	public static int save(String... modellist) {
-		String basepath = getBaseDirectory();
-		if (basepath == null)
-			return -1;
-		
-		for (String m: modellist) {
-			if (m != null) {
-				ImagePlus imp = WindowManager.getImage(m);
+		public static int save(String... modellist) {
+			String basepath = getBaseDirectory();
+			if (basepath == null)
+				return -1;
 			
-				if (m.equals("Base")) {
-					if (imp.changes) {
-						notice("Saving Base...");
-						saveAVI(imp, IJX.Util.createPath(basepath, "Base.avi"));
+			for (String m: modellist) {
+				if (m != null) {
+					ImagePlus imp = WindowManager.getImage(m);
+				
+					if (m.equals("Base")) {
+						if (imp.changes) {
+							notice("Saving Base...");
+							saveAVI(imp, IJX.Util.createPath(basepath, "Base.avi"));
+							imp.changes = false;
+							FileInfo finfo = imp.getOriginalFileInfo();
+							if (finfo == null) finfo = new FileInfo();
+							finfo.directory = basepath;
+							imp.setFileInfo(finfo);
+						}
+					
+						notice("Saving metadata...");
+						
+						String LF = System.getProperty("line.separator");
+						String outStr = IJX.getVoxelSizeAsString(imp) + LF;
+						outStr += IJX.Util.metadata(MD_THRESHOLD, minThreshold, maxThreshold) + LF;
+						
+						if (IJIF.bdatList != null)
+							outStr += bdatList.toString(); 
+									
+						IJ.saveString(outStr, IJX.Util.createPath(basepath, "metadata.txt"));
+					
+						if (IJIF.fec != null && IJIF.fec.size() >= 2)
+							IJX.savePointList(IJIF.fec, basepath, IJIF.FILENAME_FEC);
+					} else if (imp != null) {
+						notice("Saving " + m + "...");
+						saveAVI(imp, IJX.Util.createPath(basepath, m + ".avi"));
 						imp.changes = false;
-						FileInfo finfo = imp.getOriginalFileInfo();
-						if (finfo == null) finfo = new FileInfo();
-						finfo.directory = basepath;
-						imp.setFileInfo(finfo);
 					}
-				
-					notice("Saving metadata...");
-					
-					String LF = System.getProperty("line.separator");
-					String outStr = IJX.getVoxelSizeAsString(imp) + LF;
-					outStr += IJX.Util.metadata(MD_THRESHOLD, minThreshold, maxThreshold) + LF;
-					
-					if (IJIF.bdatList != null)
-						outStr += bdatList.toString(); 
-								
-					IJ.saveString(outStr, IJX.Util.createPath(basepath, "metadata.txt"));
-				
-					if (IJIF.fec != null && IJIF.fec.size() >= 2)
-						IJX.savePointList(IJIF.fec, basepath, IJIF.FILENAME_FEC);
-				} else if (imp != null) {
-					notice("Saving " + m + "...");
-					saveAVI(imp, IJX.Util.createPath(basepath, m + ".avi"));
-					imp.changes = false;
 				}
 			}
+			
+			return 0;
 		}
 		
-		return 0;
-	}
-	
-	public static int saveOpened() {
-		int IDs[] = WindowManager.getIDList();
-		String wins[] = WindowManager.getImageTitles();
-		
-		for (int id: IDs) {
-			String winname = WindowManager.getImage(id).getTitle();
+		public static int saveOpened() {
+			int IDs[] = WindowManager.getIDList();
+			String wins[] = WindowManager.getImageTitles();
 			
-			int cnt = 0;
+			for (int id: IDs) {
+				String winname = WindowManager.getImage(id).getTitle();
+				
+				int cnt = 0;
+				for (int i = 0; i < wins.length; i++)
+					if (wins[i].equals(winname))
+						cnt++;
+				
+				if (cnt > 1)
+					WindowManager.getImage(id).setTitle(WindowManager.makeUniqueName(winname));	
+			}
+			
+			wins = WindowManager.getImageTitles();
+			boolean changed[] = new boolean[wins.length];
+			for(int i = 0; i < wins.length; i++) 
+				changed[i] = WindowManager.getImage(wins[i]).changes;
+			
+			GenericDialog gd = new GenericDialog("Select windows");
+			gd.addMessage("Select windows that you want to save as a model.\nThose with any change are checked.");
+			for(int i = 0; i < wins.length; i++) 
+				gd.addCheckbox(wins[i], changed[i]);
+			gd.showDialog();
+			
 			for (int i = 0; i < wins.length; i++)
-				if (wins[i].equals(winname))
-					cnt++;
-			
-			if (cnt > 1)
-				WindowManager.getImage(id).setTitle(WindowManager.makeUniqueName(winname));	
-		}
-		
-		wins = WindowManager.getImageTitles();
-		boolean changed[] = new boolean[wins.length];
-		for(int i = 0; i < wins.length; i++) 
-			changed[i] = WindowManager.getImage(wins[i]).changes;
-		
-		GenericDialog gd = new GenericDialog("Select windows");
-		gd.addMessage("Select windows that you want to save as a model.\nThose with any change are checked.");
-		for(int i = 0; i < wins.length; i++) 
-			gd.addCheckbox(wins[i], changed[i]);
-		gd.showDialog();
-		
-		for (int i = 0; i < wins.length; i++)
-			if (!gd.getNextBoolean())
-				wins[i] = null;
-			else
-				WindowManager.getImage(wins[i]).changes = true;
-		
-		
-		return save(wins);
-	}
-	
-	public static int binarize() {
-		ImagePlus imp = WindowManager.getCurrentImage();
-		imp.killRoi();
-		
-		IJ.run(imp, "Threshold...", "");
-		IJ.setThreshold(imp, 150, 1500);
-		
-		int r = IJX.WaitForUser("Image is thresholded for bone density.\n"+
-			"Please review and adjust the threshold if necessary;\nthen press OK of this dialog.");
-		if (r == -1) return -1;
-		
-		Calibration cal = imp.getCalibration();
-		minThreshold = cal.getCValue(imp.getProcessor().getMinThreshold());
-		maxThreshold = cal.getCValue(imp.getProcessor().getMaxThreshold());
-		
-		IJ.run(imp, "Make Binary", "method=Default background=Default");
-		
-		int option = AnalyzeParticle.defaultOption | ParticleAnalyzer.SHOW_MASKS;
-		AnalyzeParticle ap = new AnalyzeParticle(option, AnalyzeParticle.defaultMeasurements,
-				0, 4, imp.getCalibration(), null);
-		ap.analyzer.setHideOutputImage(true);
-		
-		for (int z = 0; z < imp.getNSlices(); z++) {
-			imp.setSliceWithoutUpdate(z+1);
-			int nResults = ap.newAnalyze(imp, imp.getProcessor());
-			ImagePlus impMsk = ap.analyzer.getOutputImage();
-			if (nResults > 0) {
-				ImageCalculator ic = new ImageCalculator();
-				ic.run("XOR", imp, impMsk);
-				//imp3.show();
-			}
-			IJX.forceClose(impMsk);
+				if (!gd.getNextBoolean())
+					wins[i] = null;
+				else
+					WindowManager.getImage(wins[i]).changes = true;
 			
 			
-		}
-		//IJ.run(imp, "Fill Holes", "stack");
-		
-		return 0;
-	}
-	
-	public static int align(String wintitle) {
-		if (ij3d) {
-			IJIF3D.Modeler.updateFEC(wintitle);
+			return save(wins);
 		}
 		
-		OrthogonalTransformer ot = new OrthogonalTransformer();
-		int r = ot.run(wintitle, IJIF.fec);
-		
-		if (r == 0) {
-			ImagePlus imp = ot.getTransformedImage();
-			IJ.setThreshold(imp, 64, 255, null); // TODO: threshold by user-defined ??
+		public static String binarize() {
+			ImagePlus imp = WindowManager.getCurrentImage();
+			imp.killRoi();
+			
+			IJ.run(imp, "Threshold...", "");
+			IJ.setThreshold(imp, 150, 1500);
+			
+			int r = IJX.WaitForUser("Image is thresholded for bone density.\n"+
+				"Please review and adjust the threshold if necessary;\nthen press OK of this dialog.");
+			if (r == -1) return null;
+			
+			Calibration cal = imp.getCalibration();
+			minThreshold = cal.getCValue(imp.getProcessor().getMinThreshold());
+			maxThreshold = cal.getCValue(imp.getProcessor().getMaxThreshold());
+			
 			IJ.run(imp, "Make Binary", "method=Default background=Default");
-			//IJ.run(imp, "Fill Holes", "stack");
-			IJX.rename(imp, "Base");
 			
-			mPointList pl = ot.getTransformedPointList(); 
-			if (pl != null && pl.size() >= 2) {
-				fec = pl;
+			int option = AnalyzeParticle.defaultOption | ParticleAnalyzer.SHOW_MASKS;
+			AnalyzeParticle ap = new AnalyzeParticle(option, AnalyzeParticle.defaultMeasurements,
+					0, 4, imp.getCalibration(), null);
+			ap.analyzer.setHideOutputImage(true);
+			
+			for (int z = 0; z < imp.getNSlices(); z++) {
+				imp.setSliceWithoutUpdate(z+1);
+				int nResults = ap.newAnalyze(imp, imp.getProcessor());
+				ImagePlus impMsk = ap.analyzer.getOutputImage();
+				if (nResults > 0) {
+					ImageCalculator ic = new ImageCalculator();
+					ic.run("XOR", imp, impMsk);
+					//imp3.show();
+				}
+				IJX.forceClose(impMsk);
 				
-				if (ij3d)
-					IJIF3D.Modeler.showModelAndPoints(imp, pl);
-			} else {
-				r = determineFemEpiCondylesBy2D(imp);
+				
 			}
-		}
-		
-		return r;
-	}
-	
-	public static int autoEdit() {
-		notice("Analyzing...");
-		
-		ImagePlus imp = WindowManager.getImage("Base");
-				
-		BoundaryTool bt = new BoundaryTool(imp);
-		bt.scanFemur(fec.toArray());
-		bt.scanProxTibia();
-		bt.scanDistalTibia();
-		bt.scanProxNotch();
-		
-		int nrx = bt.getMeanNotchRoofX();
-		int z2 = bt.findDistal(BoundaryData.NOTCH).z;
-		
-		ImagePlus imp2 = imp.duplicate(); imp2.show();
-		
-		for (int z = 0; z <= z2; z++) {
-			ByteProcessor ip = (ByteProcessor)imp2.getImageStack().getProcessor(z + 1);
+			//IJ.run(imp, "Fill Holes", "stack");
 			
-			ip.setColor(128);
-			ip.drawLine(nrx, 0, nrx, imp2.getHeight() - 1);
+			return imp.getTitle();
 		}
 		
-		bt.drawMulti(imp2, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
+		public static int align(String wintitle) {
+			if (ij3d) {
+				IJIF3D.Modeler.updateFEC(wintitle);
+			}
+			
+			OrthogonalTransformer ot = new OrthogonalTransformer();
+			int r = ot.run(wintitle, IJIF.fec);
+			
+			if (r == 0) {
+				ImagePlus imp = ot.getTransformedImage();
+				IJ.setThreshold(imp, 64, 255, null); // TODO: threshold by user-defined ??
+				IJ.run(imp, "Make Binary", "method=Default background=Default");
+				//IJ.run(imp, "Fill Holes", "stack");
+				IJX.rename(imp, "Base");
+				
+				mPointList pl = ot.getTransformedPointList(); 
+				if (pl != null && pl.size() >= 2) {
+					fec = pl;
+					
+					if (ij3d)
+						IJIF3D.Modeler.showModelAndPoints(imp, pl);
+				} else {
+					r = determineFemEpiCondylesBy2D(imp);
+				}
+			}
+			
+			return r;
+		}
 		
-		notice(null);
-		notice("Review the created image; then click OK or press ESC key.");
-		
-		String msg = "To create isolated bone models (FemOnly and TibOnly),\n";
-		msg += "MFC, LFC,Tibial spine and plateau, and splitting line between MFC and LFC are\n";
-		msg += "machinary identified at the notch-level slices.\n";
-		msg += "Please review the image; if you agree, press OK. If not, press ESC key.";
-		
-		int r = IJX.WaitForUser(msg);
-		
-		bt.close();
-		
-		if (r == -1) return -1;
-		
-		IJX.forceClose(imp2);
-		
-		notice(null);
-		notice("Creating isolated bone models...\nThis may take some time...");
-		
-		ImagePlus impTib = createTibOnly(imp, bt); impTib.show();
-		ImagePlus impFem = createFemOnly(imp, impTib); impFem.show();  
-		
-		IJIF.bdatList = bt;
-		IJIF.notchRoofX = nrx;
-		
-		return 0;
-	}
+		public static int autoEdit() {
+			notice("Analyzing...");
+			
+			ImagePlus imp = WindowManager.getImage("Base");
+			if (fec == null) {
+				int r = determineFemEpiCondylesBy2D(imp);
+				if (r == -1) return -1;
+			}
+					
+			BoundaryTool bt = new BoundaryTool(imp);
+			bt.scanFemur(fec.toArray());
+			bt.scanProxTibia();
+			bt.scanDistalTibia();
+			bt.scanProxNotch();
+			
+			int nrx = bt.getMeanNotchRoofX();
+			int z2 = bt.findDistal(BoundaryData.NOTCH).z;
+			
+			ImagePlus imp2 = imp.duplicate(); imp2.show();
+			
+			for (int z = 0; z <= z2; z++) {
+				ByteProcessor ip = (ByteProcessor)imp2.getImageStack().getProcessor(z + 1);
+				
+				ip.setColor(128);
+				ip.drawLine(nrx, 0, nrx, imp2.getHeight() - 1);
+			}
+			
+			bt.drawMulti(imp2, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
+			
+			notice(null);
+			notice("Review the created image; then click OK or press ESC key.");
+			
+			String msg = "To create isolated bone models (FemOnly and TibOnly),\n";
+			msg += "MFC, LFC,Tibial spine and plateau, and splitting line between MFC and LFC are\n";
+			msg += "machinary identified at the notch-level slices.\n";
+			msg += "Please review the image; if you agree, press OK. If not, press ESC key.";
+			
+			int r = IJX.WaitForUser(msg);
+			
+			bt.close();
+			
+			if (r == -1) return -1;
+			
+			IJX.forceClose(imp2);
+			
+			notice(null);
+			notice("Creating isolated bone models...\nThis may take some time...");
+			
+			ImagePlus impTib = createTibOnly(imp, bt); impTib.show();
+			ImagePlus impFem = createFemOnly(imp, impTib); impFem.show();  
+			
+			IJIF.bdatList = bt;
+			IJIF.notchRoofX = nrx;
+			
+			return 0;
+		}
 	}
 	
 	/*
@@ -783,12 +792,8 @@ public class IJIF implements Measurements {
 			
 			Quadrant.save(basepath);
 			
-			ResultsTable rt = Analyzer.getResultsTable();
-			if (rt.size() > 0)
-				rt.save(IJX.Util.createPath(basepath, FILENAME_RESULTS));
-			
-			//if (ij3d && mode2D3D == 2)
-			//	IJIF3D.Quad.snapshot(basepath);
+			if (ij3d)
+				IJIF3D.Quad.save(basepath);
 			
 			return 0;
 		}
@@ -807,10 +812,15 @@ public class IJIF implements Measurements {
 			if (tib) impT = Quadrant.detectTibialSystem();
 				
 			if (impF != null || impT != null) {
-				ImagePlus impC = IJX.createCombinedImage("Quadrant System", impF, impT);
+				ImagePlus impF2 = (impF != null) ? impF.flatten() : null;
+				ImagePlus impT2 = (impT != null) ? impT.flatten() : null;
+				if (impF2 != null) impF2.show(); if (impT2 != null) impT2.show();
+				
+				ImagePlus impC = IJX.createCombinedImage("Quadrant System", impF2, impT2);
 				impC.show(); 
 				WindowManager.toFront(WindowManager.getFrame("Quadrant System"));
 				WindowManager.setCurrentWindow(impC.getWindow());
+				IJX.forceClose(impF2, impT2);
 				
 				String msg = "";
 				if (fem && impF == null)
@@ -976,7 +986,7 @@ class SimpleRotateFilter implements ExtendedPlugInFilter, DialogListener {
 		gd.addNumericField("Angle: ", this.angle, 3);
 		gd.addPreviewCheckbox(pfr);
 		gd.addDialogListener(this);
-		//gd.getPreviewCheckbox().setState(true);
+		gd.getPreviewCheckbox().setState(true);
 		gd.showDialog();
 		
 		wasOK = gd.wasOKed();

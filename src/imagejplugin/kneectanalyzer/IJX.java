@@ -64,6 +64,12 @@ class IJX {
 		}
 	}
 	
+	public static void forceClose(String wintitle) {
+		ImagePlus imp;
+		if ((imp = WindowManager.getImage(wintitle)) != null)
+			IJX.forceClose(imp);
+	}
+	
 	public static void rename(ImagePlus imp, String name) {
 		int IDs[] = WindowManager.getIDList();
 		
@@ -149,6 +155,13 @@ class IJX {
 			return null;
 		
 		return (String[]) strlist.toArray(new String[0]);
+	}
+	
+	public static boolean isOpenN(String nonImageTitle) {
+		String[] wintitles = WindowManager.getNonImageTitles();
+		if (Util.getIndexOf(wintitles, nonImageTitle) != -1)
+			return true;
+		return false;
 	}
 	
 	public static ImagePlus createCombinedImage(String title, ImagePlus... imps) {
@@ -271,6 +284,39 @@ class IJX {
 		IJX.rename(impLFC, "LFCOnly");
 		impLFC.show();
 		return impLFC;
+	}
+	
+	public static void convertTunOnly(ImagePlus imp, QRoiList ql) {
+		IJ.setForegroundColor(128, 128, 128);
+		for (QRoi qroi: ql.qroiList) {
+			imp.setSliceWithoutUpdate(qroi.z + 1);
+			imp.getProcessor().fill(qroi.roi);
+		}
+		
+		imp.updateAndDraw();
+		
+		IJ.setThreshold(imp, 127, 128);
+		IJ.run(imp, "Make Binary", "method=Default background=Default");
+	}
+	
+	public static ImagePlus createTunOnlyFem(ImagePlus impLFC, QRoiList ql) {
+		ImagePlus impSag = IJX.createAx2Sag(impLFC);
+		IJX.convertTunOnly(impSag, Quadrant.tunnelRoisFem);
+		ImagePlus impTun = IJX.createSag2Ax(impSag);
+		IJX.rename(impTun, "TunOnlyFem");
+		
+		IJX.forceClose(impSag);
+		
+		return impTun;
+	}
+	
+	public static ImagePlus createTunOnlyTib(ImagePlus impTib, QRoiList ql) {
+		ImagePlus impTun = impTib.duplicate();
+		impTun.show();
+		IJX.convertTunOnly(impTun, ql);
+		IJX.rename(impTun, "TunOnlyTib");
+		
+		return impTun;
 	}
 	
 	public static ImagePlus createAx2Sag(ImagePlus imp) {
@@ -417,6 +463,13 @@ class IJX {
 			return -1;
 		}
 		
+		static int getIndexOf(String array[], String v) {
+			for (int i = 0; i < array.length; i++)
+				if (array[i].equals(v))
+					return i;
+			return -1;
+		}
+		
 		static int getLastIndexOf(double array[], double v) {
 			for (int i = array.length - 1; i >= 0; i--)
 				if (array[i] == v)
@@ -475,6 +528,13 @@ class IJX {
 				ret += File.separator;
 			ret += filename;
 			return ret;
+		}
+		
+		static String getLastDirectory(String path) {
+			if (path == null) return null;
+			
+			String l[] = path.split(File.separator);
+			return l[l.length - 1];
 		}
 		
 		static boolean doesFileExist(String dir, String filename) {
