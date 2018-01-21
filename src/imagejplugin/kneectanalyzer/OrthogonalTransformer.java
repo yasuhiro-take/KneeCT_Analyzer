@@ -33,7 +33,9 @@ public class OrthogonalTransformer /* implements PlugIn */ {
 		ImagePlus imp = WindowManager.getImage(wintitle);
 		
 		if (imp == null)  // when wintitle == null || wintitle is closed.
-			imp = WindowManager.getCurrentImage();
+			if ((imp = WindowManager.getCurrentImage()) == null)
+				return -1;
+		
 		imp.killRoi();
 		
 		if (pl != null)
