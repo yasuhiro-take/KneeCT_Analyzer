@@ -188,7 +188,6 @@ public class QuadrantAnalysisGUI {
 		btn_2 = new JButton(btntitles[1]);
 		frame.getContentPane().add(btn_2, "4, 12, 5, 1");
 		btn_2.addActionListener(new btnActionListener());
-		btn_2.setEnabled(false);
 		
 		label_3L = new JLabel("");
 		frame.getContentPane().add(label_3L, "2, 14");
@@ -271,7 +270,9 @@ public class QuadrantAnalysisGUI {
 			messageBox.setText(msg);
 			break; 
 		}
-		case 1: {
+		case 1:
+		case 2:
+		 {
 			String msg = null;
 			int qsystem = Quadrant.systemDetermined();
 			if (qsystem == 3) {
@@ -282,15 +283,14 @@ public class QuadrantAnalysisGUI {
 				label_save.setIcon(arrowD);
 			} else {
 				msg = "Available Quadrant system: " + quadStatus[qsystem] + ".\n";
-				msg += "Proceed to *"+btntitles[1]+"* to manually determine Quadrant coordinates (by 2D/3D), or *";
+				msg += "Proceed to *"+btntitles[1]+"* to manually determine Quadrant coordinates, or *";
 				msg += btntitles[2]+"* for available system.";
 				label_2L.setIcon(arrowR);
 				label_3L.setIcon(arrowR);
 			}
 			messageBox.setText(msg);
 			break;
-		}
-		case 2: break; 
+		} 
 		case 3: {
 			String msg = "Detected tunnel data are listed in Results window, and 2D images (";
 			msg += Quadrant.WINTITLE_FEM2D + " & " + Quadrant.WINTITLE_TIB2D + ").\n";
@@ -492,7 +492,7 @@ public class QuadrantAnalysisGUI {
 				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D();
 				break;
 			case '2':
-				r = -1;
+				r = IJIF.Quad.determineSystem2D();
 				break;
 			case '3':
 				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		

@@ -458,8 +458,8 @@ public class IJIF implements Measurements {
 		GenericDialog gd = new GenericDialog(title);
 		gd.addMessage(msg);
 		String items[] = new String[2];
-		items[0] = "Femoral "+suffix;
-		items[1] = "Tibial "+suffix;
+		items[0] = "Femoral "+ (suffix != null ? suffix : "");
+		items[1] = "Tibial "+ (suffix != null ? suffix : "");
 		gd.addRadioButtonGroup(null, items, 2, 1, items[0]);
 		gd.showDialog();
 		
@@ -834,15 +834,11 @@ public class IJIF implements Measurements {
 												(impF != null), (impT != null), new boolean[] {true,true});
 				if (boo2 == null) return -1;
 				
-				if (fem && !boo2[0]) {
-					IJX.forceClose(impF);
+				if (fem && !boo2[0])
 					Quadrant.systemCoordFem = null;
-				}
-				
-				if (tib && !boo2[1]) {
-					IJX.forceClose(impT);
+								
+				if (tib && !boo2[1])
 					Quadrant.systemCoordTib = null;
-				}
 				
 				IJX.forceClose(impC);
 				
@@ -879,6 +875,11 @@ public class IJIF implements Measurements {
 		public static int refreshResults2D() {
 			Quadrant.measurements2Coord();
 			Quadrant.syncWithResults();
+			return 0;
+		}
+		
+		public static int determineSystem2D() {
+			Quadrant.setSystem(notchRoofX);
 			return 0;
 		}
 	}

@@ -3,9 +3,12 @@ package imagejplugin.kneectanalyzer;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
+import ij.gui.ImageCanvas;
 import ij.gui.Line;
 import ij.gui.Overlay;
 import ij.gui.Roi;
+import ij.gui.RotatedRectRoi;
+import ij.gui.TextRoi;
 import ij.measure.Calibration;
 import ij.measure.CurveFitter;
 import ij.measure.ResultsTable;
@@ -17,6 +20,7 @@ import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -225,12 +229,23 @@ class Quadrant  {
 	static final String WINTITLE_FEM2D = "FemoralQuadrant";
 	static final String WINTITLE_TIB2D = "TibialQuadrant";
 	static final String WINTITLES[] = new String[] { null, WINTITLE_FEM2D, WINTITLE_TIB2D };
-	static final String WINTITLES3D[] = new String[] { null, WINTITLE_FEM2D+"3D", WINTITLE_TIB2D+"3D" }; 
+	static final String WINTITLES3D[] = new String[] { null, WINTITLE_FEM2D+"3D", WINTITLE_TIB2D+"3D" };
+	static final String XYZSTR[] = new String[] { null, "YZ", "XY" }; 
 	private static final String FILENAME_FEMQ = "femQuad.points";
 	private static final String FILENAME_TIBQ = "tibQuad.points";
 	private static final String FILENAME_FEMTUN = "femTun.points";
 	private static final String FILENAME_TIBTUN = "tibTun.points";
 	private static final String FILENAME_RESULTS = "tunnelCoords.txt";
+	private static final String COORDSTR_FEM[] = new String[] { "DS:100", "DS:0 HL:0", "HL:100"};
+	private static final String COORDSTR_TIB[] = new String[] { "ML:0 AP:0", "ML:100", "AP:100"};
+	private static final String COORDSTRS[][] = new String[][] { null, COORDSTR_FEM, COORDSTR_TIB };
+	private static Font coordFont = new Font(Font.SERIF, 0, 16);
+	private static Color gridColor = new Color(0,255,0);
+	private static Color textColor = new Color(255,0,0);
+	private static Color notchRoofColor = new Color(0,0,255);
+	private static Color tunnelColor = new Color(0,255,255);
+	
+	  
 	
 	public static void init() {
 		systemCoordFem = null; systemCoordTib = null;
@@ -252,26 +267,28 @@ class Quadrant  {
 		return r;
 	}
 	
-	private static void drawOverlay(Overlay overlay, XY qxy[]) {
+	private static void draw(Overlay overlay, XY qxy[]) {
 			
-		for (double i = 0; i <= 1; i+= 0.25) {
+		for (double i = 0; i <= 1; i+= 0.25) { // vertical line (HL line)
 			int x1 = (int)(qxy[0].x + (qxy[1].x - qxy[0].x) * i);
 			int y1 = (int)(qxy[0].y + (qxy[1].y - qxy[0].y) * i);
 			int x2 = (int)(x1 + qxy[2].x - qxy[0].x);
 			int y2 = (int)(y1 + qxy[2].y - qxy[0].y);
 			
 			//cip.drawLine(x1, y1, x2, y2);
-			Line l = new Line(x1, y1, x2, y2); overlay.add(l);
+			Line l = new Line(x1, y1, x2, y2); 
+			overlay.add(l);
 		}
 		
-		for (double i = 0; i <= 1; i+= 0.25) {
+		for (double i = 0; i <= 1; i+= 0.25) { // horizontal line (DS line)
 			int x1 = (int)(qxy[0].x + (qxy[2].x - qxy[0].x) * i);
 			int y1 = (int)(qxy[0].y + (qxy[2].y - qxy[0].y) * i);
 			int x2 = (int)(x1 + qxy[1].x - qxy[0].x);
 			int y2 = (int)(y1 + qxy[1].y - qxy[0].y);
 			
 			//cip.drawLine(x1, y1, x2, y2);
-			Line l = new Line(x1, y1, x2, y2); overlay.add(l);
+			Line l = new Line(x1, y1, x2, y2);
+			overlay.add(l);
 		}
 	}
 	
@@ -309,19 +326,13 @@ class Quadrant  {
 		
 		draw(ip, c, qxy);
 	}
-	private static void drawFem(ImageProcessor ip, Color c, Calibration cal) {
-		mPointList pl_px = systemCoordFem.clonePixelized(cal);
-		drawFem(ip, c, pl_px);
-	}
+	
 	private static void drawFem(Overlay overlay, Color c, mPointList pl_px) {
 		XY qxy[] = new XY[3];
-		for (int i = 0; i < 3; i++) {
-			//qxy[i] = new XY();
-			//qxy[i].setFromPointYZ(pl_px.get(i));
+		for (int i = 0; i < 3; i++)
 			qxy[i] = pl_px.get(i).getYZ();
-		}
 		
-		drawOverlay(overlay, qxy);
+		draw(overlay, qxy);
 		overlay.setStrokeColor(c);
 	}
 	
@@ -335,9 +346,35 @@ class Quadrant  {
 		
 		draw(ip, c, qxy);
 	}
-	private static void drawTib(ImageProcessor ip, Color c, Calibration cal) {
-		mPointList pl_px = systemCoordTib.clonePixelized(cal);
-		drawTib(ip, c, pl_px);
+	private static void drawTib(Overlay ol, Color c, mPointList pl_px) {
+		XY qxy[] = new XY[3];
+		for (int i = 0; i < 3; i++)
+			qxy[i] = pl_px.get(i).getXY();
+		
+		draw(ol, qxy);
+		ol.setStrokeColor(c);
+	}
+	
+	private static Overlay createQuadrantOverlay(XY qxy_px[], String coordStr[]) {
+		Overlay ol = new Overlay();
+		draw(ol, qxy_px);
+		ol.setStrokeColor(gridColor);
+		
+		int xoff[] = new int[] { -24, 0, -16 }; int yoff[] = new int [] { -14, -14, +4 };
+		for (int i = 0; i < 3; i++) {
+			TextRoi text = new TextRoi((int)qxy_px[i].x + xoff[i], (int)qxy_px[i].y + yoff[i], coordStr[i], coordFont);
+			text.setStrokeColor(textColor);
+			ol.add(text);
+		}
+		
+		return ol;
+	}
+	
+	private static void drawAsOverlay(ImagePlus imp, XY qxy_px[], String coordStr[]) {
+		Overlay ol = createQuadrantOverlay(qxy_px, coordStr);
+		imp.killRoi();
+		imp.setOverlay(ol);
+		imp.updateAndDraw();
 	}
 	
 	private static XY getCoord(XY xy, XY qxy[]) {
@@ -437,14 +474,13 @@ class Quadrant  {
 		
 		ql.toOverlay(overlay);
 		
-		overlay.setFillColor(new Color(0,255,255));
+		overlay.setFillColor(tunnelColor);
 		imp.setOverlay(overlay);
 		imp.updateAndDraw();
 	}
 	
 	private static QCurveFitter analyzeBlumensaat(ImagePlus impSagZ) {
-		int W0 = impSagZ.getWidth();
-		Color colR = new Color(255, 0, 0), colB = new Color(0, 0, 255); 
+		int W0 = impSagZ.getWidth(); 
 		Calibration cal = impSagZ.getCalibration();
 		double pxSize = Math.sqrt(Math.pow(cal.pixelWidth, 2) + Math.pow(cal.pixelHeight, 2));
 			
@@ -464,12 +500,12 @@ class Quadrant  {
 			ImagePlus impS = impSagZ.duplicate();
 			IJ.run(impS, "RGB Color", "");
 			ColorProcessor cip = (ColorProcessor)impS.getProcessor();
-			cip.setLineWidth(1); cip.setColor(colB);
+			cip.setLineWidth(1); cip.setColor(notchRoofColor);
 			
 			for (int i = 0; i < x.length; i++)
 				cip.fillRect((int)x[i] - 1, (int)y[i] - 1, 3, 3);
 			
-			cip.setColor(colR);
+			cip.setColor(textColor);
 			int x1 = 0, y1 = (int)cf.f(0), x2 = W0 - 1, y2 = (int)cf.f(W0 - 1);
 			cip.drawLine(x1, y1, x2, y2);
 			
@@ -594,18 +630,13 @@ class Quadrant  {
 		mPointList pl = getRefCoordsFem(impSagM, cf, impFem.getWidth() / 2);
 		mPointList femQpl = getSystemCoordFem(pl);
 		correctHL100(impSagM, femQpl);
+		XY qxy[] = femQpl.toArrayXY("YZ");
 		
-		Overlay ol = new Overlay();
-		//drawFem(cf.impWork.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
-		drawFem(ol, new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
-		cf.impWork.setOverlay(ol);
-		cf.impWork.updateAndDraw();
-		
+		drawAsOverlay(cf.impWork, qxy, COORDSTR_FEM);
 		IJX.rename(cf.impWork, Quadrant.WINTITLE_FEM2D);
-		//systemCoordFem = IJX.Util.px2real(femQpl, impFem.getCalibration());
 		systemCoordFem = femQpl.cloneRealized(impFem.getCalibration());
 		
-		IJX.forceClose(impSagZ); IJX.forceClose(impSagM);
+		IJX.forceClose(impSagZ, impSagM);
 		
 		return cf.impWork;
 	}
@@ -737,13 +768,12 @@ class Quadrant  {
 		ImagePlus impSagZ = IJX.createLFCSagittalProjection(nrx);
 		IJ.run(impSagZ, "RGB Color", "");
 		
-		//PointList femQpl = IJX.Util.real2px(systemCoordFem, impFem.getCalibration());
-		mPointList femQpl = systemCoordFem.clonePixelized(impFem.getCalibration());
+		if (systemCoordFem != null) {
+			mPointList pl = systemCoordFem.clonePixelized(impFem.getCalibration());
+			XY qxy[] = pl.toArrayXY("YZ");
+			drawAsOverlay(impSagZ, qxy,COORDSTR_FEM);
+		}
 		
-		//drawFem(impSagZ.getProcessor(), new Color(0,255,0), femQpl); // TODO: femQpl is coordinates in px.
-		Overlay ol = new Overlay();
-		drawFem(ol, new Color(0,255,0), femQpl);
-		impSagZ.setOverlay(ol);
 		IJX.rename(impSagZ, WINTITLE_FEM2D);
 		impSagZ.show();
 		
@@ -757,9 +787,9 @@ class Quadrant  {
 		IJ.run(impTibZ, "RGB Color", "");
 		
 		if (systemCoordTib != null) {
-			//PointList pl = IJX.Util.real2px(systemCoordTib, impTib.getCalibration());
 			mPointList pl = systemCoordTib.clonePixelized(impTib.getCalibration());
-			drawTib(impTibZ.getProcessor(), new Color(0,255,0), pl);
+			XY qxy[] = pl.toArrayXY("XY");
+			drawAsOverlay(impTibZ, qxy,COORDSTR_TIB);
 		}
 		
 		IJX.rename(impTibZ, WINTITLE_TIB2D);
@@ -778,6 +808,7 @@ class Quadrant  {
 			if ((imp = WindowManager.getImage(WINTITLE_TIB2D)) == null && create)
 				imp = create2DImageTib(WindowManager.getImage("TibOnly"));
 		
+		//imp is shown already.
 		return imp;
 	}
 	
@@ -891,8 +922,8 @@ class Quadrant  {
 		ImagePlus impTib = WindowManager.getImage(WINTITLE_TIB2D);
 		if (impFem != null && impFem.getOverlay() != null && tunnelRoisFem != null)
 			tunnelRoisFem.removeFromOverlay(impFem.getOverlay());
-		if (impTib != null && impTib.getOverlay() != null)
-			impTib.getOverlay().clear();
+		if (impTib != null && impTib.getOverlay() != null && tunnelRoisTib != null)
+			tunnelRoisTib.removeFromOverlay(impTib.getOverlay());
 		
 		if (tunnelRoisFem != null) {
 			tunnelRoisFem.sync(WINTITLE_FEM2D, ResultsTable.getResultsTable());
@@ -909,7 +940,56 @@ class Quadrant  {
 			outputTunnels2D(impTib, tunnelRoisTib);
 	}
 	
-	
+	public static int setSystem(int nrx) {
+		int ft = IJIF.radiobuttonFTDialog("Choice", "Choose below to manually determine.", "Quadrant System");
+		if (ft == 0) return -1;
+		ImagePlus imp = (ft == 1) ? get2DImage(FEM, true, nrx) : get2DImage(TIB, true, 0);
+		
+		RotRectTool rrt = null;
+		if (ft == FEM && systemCoordFem != null) {
+			mPointList pl = systemCoordFem.clonePixelized(IJX.getBaseCalibration());
+			rrt = new RotRectTool(pl.toArrayXY("YZ")); 
+		} else if (ft == TIB && systemCoordTib != null) {
+			mPointList pl = systemCoordTib.clonePixelized(IJX.getBaseCalibration());
+			rrt = new RotRectTool(pl.toArrayXY("XY"));
+		} else {
+			rrt = new RotRectTool(imp);
+		}
+		
+		RotatedRectRoi rrect = rrt.makeRoi();	
+		imp.setRoi(rrect);
+		IJ.setTool("rotrect");
+		
+		int r = IJX.WaitForUser("Modify Rotated Rect Roi to fit the Quadrant system.\n"+
+								"Then click OK.");
+		if (r == -1) return -1;
+		
+		RotatedRectRoi rrectN = (RotatedRectRoi)imp.getRoi();
+		RotRectTool rrt2 = new RotRectTool(rrectN);
+		
+		XY qxy[] = new XY[3];
+		if ((ft == FEM && !rrt2.isUnrotatedRect()) || 
+			(ft == TIB && (rrt2.isDiagonalHorizontal() || rrt2.isDiagonalVertical()))) {
+			qxy[0] = rrt2.getW(); qxy[1] = rrt2.getN(); qxy[2] = rrt2.getS();
+		} else if ((ft == TIB && !rrt2.isDiagonalHorizontal() && !rrt2.isDiagonalVertical()) ||
+					(ft == FEM && rrt2.isUnrotatedRect())) {
+			qxy[0] = rrt2.getNW(); qxy[1] = rrt2.getNE(); qxy[2] = rrt2.getSW();
+		} else {
+			return IJX.error("Unexpected Error:"+ft+" "+rrt2.isUnrotatedRect()+rrt2.isDiagonalHorizontal() + rrt2.isDiagonalVertical(), -1);
+		}
+		
+		drawAsOverlay(imp, qxy, COORDSTRS[ft]);
+		
+		mPointList pl = new mPointList();
+		for (int i = 0; i < 3; i++)
+			pl.add(qxy[i], XYZSTR[ft], 0);
+		if (ft == FEM)
+			systemCoordFem = pl.cloneRealized(IJX.getBaseCalibration());
+		else
+			systemCoordTib = pl.cloneRealized(IJX.getBaseCalibration());
+		
+		return 0;
+	}
 	
 	public static void load(String dir) {
 		systemCoordFem = IJX.loadPointList(dir, FILENAME_FEMQ);
@@ -924,7 +1004,6 @@ class Quadrant  {
 			IJX.savePointList(Quadrant.systemCoordTib, basepath, FILENAME_TIBQ);
 		
 		if (Quadrant.tunnelRoisFem != null) {
-			//PointList pl = IJX.Util.createPointListfromResults(WINTITLE_FEM2D, "Z", "X", "Y");
 			mPointList pl = IJX.createPointListfromResults(WINTITLE_FEM2D, "Z", "X", "Y");
 			IJX.savePointList(pl, basepath, FILENAME_FEMTUN);
 		}
