@@ -13,10 +13,12 @@ import javax.vecmath.Point3d;
 import vib.BenesNamedPoint;
 import vib.PointList;
 import vib.PointList.PointListListener;
+import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.GenericDialog;
 import ij.gui.Roi;
+import ij.gui.Toolbar;
 import ij.measure.ResultsTable;
 import ij.plugin.ImageCalculator;
 import ij.plugin.filter.Analyzer;
@@ -150,15 +152,37 @@ public class IJIF3D {
 		return null;
 	}
 	
+	static XYZ get3DCoord(int x, int y, Picker picker, Content c) {
+		if (picker != null && c != null) {
+			Point3d pnt = picker.getPickPointGeometry(c, x, y);
+			if (pnt != null)
+				return new XYZ(pnt.x, pnt.y, pnt.z);
+		}
+		
+		return null;
+	}
+	
+	static XYZ get3DCoord(XY xyPx) {
+		if (xyPx != null) {
+			int x = (int)xyPx.x, y = (int)xyPx.y;
+			
+			Picker picker = univ.getPicker();
+			Content c = picker.getPickedContent(x, y);
+		
+			return get3DCoord(x, y, picker, c);
+		}
+		return null;
+	}
+	
 	static void addPoint(XY xyPx) {
 		if (xyPx != null) {
 			int x = (int)xyPx.x, y = (int)xyPx.y;
 				
 			Picker picker = univ.getPicker();
 			Content c = picker.getPickedContent(x, y);
+			XYZ pnt = get3DCoord(x, y, picker, c);
 				
-			if (c != null) {
-				Point3d pnt = picker.getPickPointGeometry(c, x, y);
+			if (c != null && pnt != null) {
 				float tol = c.getLandmarkPointSize();
 				PointList pl = c.getPointList();
 				if (pl.pointAt(pnt.x, pnt.y, pnt.z, tol) == null)
@@ -168,6 +192,41 @@ public class IJIF3D {
 				c.showPointList(true);
 			}
 		} 
+	}
+	
+	static XYZ complementFromCentroid(XYZ centroid3d, XY centroid, XY rectPnts) {
+		Picker picker = univ.getPicker();
+		
+		XY diff = XY.sub(rectPnts, centroid);
+		double len = diff.getLength();
+		diff.x /= len; diff.y /= len;
+				
+		double lastj = 0, inc = Math.max(2, len / 20);
+		for (double j = 1; j < len; j+= inc) {
+			int x = (int)(centroid.x + diff.x * j);
+			int y = (int)(centroid.y + diff.y * j);
+					
+			Content c = picker.getPickedContent(x, y);
+			if (c != null) {
+				XYZ p = get3DCoord(x, y, picker, c);
+				if (p == null)
+					j = len;
+				else
+					lastj = j;
+			} else
+				j = len;
+		}
+				
+		if (lastj > 0) {
+			XY p2d = new XY(centroid.x + diff.x * lastj, centroid.y + diff.y * lastj);
+			XYZ p3d = get3DCoord(p2d);
+			XYZ diff3d = XYZ.sub(p3d, centroid3d);
+			diff3d.multiply(len / lastj);
+			
+			return XYZ.add(centroid3d, diff3d);
+		}
+				
+		return null;
 	}
 	
 	static class Dialog {
@@ -185,10 +244,10 @@ public class IJIF3D {
 			return ret;
 		}
 	
-		private static boolean addMisc(GenericDialog gd) {
+		private static boolean addMisc(GenericDialog gd, boolean enableTunnel) {
 			gd.addSlider("Transparency", 0, 100, 100);
 			
-			boolean hasTun = (Quadrant.tunnelDetermined() != 0);
+			boolean hasTun = (Quadrant.tunnelDetermined() != 0 && enableTunnel);
 			if (hasTun) {
 				Content cTun = univ.getContent("Tun"); 
 				boolean tun3D = (cTun != null && cTun.isVisible());
@@ -216,7 +275,7 @@ public class IJIF3D {
 			return ret;
 		}
 		
-		private static int oneBone(String title, String msg) {
+		private static int oneBone(String title, String msg, boolean enableTunnel) {
 			if (univ == null) return 0;
 			
 			int ft = 0; 
@@ -230,7 +289,7 @@ public class IJIF3D {
 			
 			String bonetitles[] = new String[] { WINTITLES_BONE[1], WINTITLES_BONE[2] };
 			gd.addRadioButtonGroup("Bone model to show", bonetitles, 2, 1, bonetitles[ft - 1]);
-			boolean hasTun = addMisc(gd);
+			boolean hasTun = addMisc(gd, enableTunnel);
 			
 			gd.showDialog();
 			if (!gd.wasOKed()) return 0;
@@ -269,7 +328,7 @@ public class IJIF3D {
 			String labels[] = new String[] { "Bone model to show" };
 			gd.addCheckboxGroup(WINTITLES_BONE.length, 1, WINTITLES_BONE, defaults, labels);
 			
-			boolean hasTun = addMisc(gd);
+			boolean hasTun = addMisc(gd, true);
 			
 			gd.showDialog();
 			if (!gd.wasOKed()) return 0;
@@ -290,8 +349,10 @@ public class IJIF3D {
 			ImagePlus[] imp = new ImagePlus[3]; // 0..fem, 1..tib, 2..tun; 3..grafts...
 			
 			if ((flag & LFCONLY) != 0) {
-				if ((imp[0] = WindowManager.getImage("LFCOnly")) == null)
-					imp[0] = IJX.createLFCOnly(IJIF.notchRoofX);
+				if ((imp[0] = WindowManager.getImage("LFCOnly")) == null) {
+					int nrx = (new RTBoundary(IJIF.WINTITLE_BOUNDARY)).getSplitX();
+					imp[0] = IJX.createLFCOnly(nrx);
+				}
 			} else if ((flag & FEMONLY) != 0) {
 				if ((imp[0] = WindowManager.getImage("FemOnly")) == null)
 					return null;
@@ -305,13 +366,13 @@ public class IJIF3D {
 			if ((flag & TUNONLYFEM) != 0) {
 				if ((tunFem = WindowManager.getImage("TunOnlyFem")) == null) {
 					IJIF.notice("creating tunnel model...This takes some moments.");
-					tunFem = IJX.createTunOnlyFem(imp[0], Quadrant.tunnelRoisFem);
+					tunFem = IJX.createTunOnlyFem(imp[0], Quadrant.tunnelRois[Quadrant.FEM]);
 				}
 				imp[2] = tunFem;
 			}
 			if ((flag & TUNONLYTIB) != 0) {
 				if ((tunTib = WindowManager.getImage("TunOnlyTib")) == null)
-					tunTib = IJX.createTunOnlyTib(imp[1], Quadrant.tunnelRoisTib);
+					tunTib = IJX.createTunOnlyTib(imp[1], Quadrant.tunnelRois[Quadrant.TIB]);
 				imp[2] = tunTib;
 			}
 			if (tunFem != null && tunTib != null) {
@@ -394,12 +455,12 @@ public class IJIF3D {
 	static class Quad {
 		private static final String FILENAME_RESULTS3D = "tunnelCoords3D.txt";
 		
-		public static int view3D() {
+		public static int view3D(boolean enableTunnel) {
 			if (open3D() == null)
 				return IJX.error("3D Viewer not available.", -1);
 			
 			hideAllContents();
-			int showFlag = Dialog.oneBone("Choice", "Select below for 3D model to create.");
+			int showFlag = Dialog.oneBone("Choice", "Select below for 3D model to create.", enableTunnel);
 			if (showFlag == 0) return -1;
 			lastShowFlag = showFlag;
 			
@@ -418,6 +479,63 @@ public class IJIF3D {
 			
 			if (ft == 1)
 				univ.rotateToPositiveXZ();
+			
+			return 0;
+		}
+		
+		private static int createSystemDetermineView() {
+			if (view3D(false) == 0) {
+				int ft = Dialog.flag2ft(lastShowFlag);
+				// if ft==1, rotate...
+				
+				IJ.setTool("rotrect");
+				int r = IJX.WaitForUser("Use Rotated-Rectangle selection tool\n"+
+						"to fit the Quadrant system.\n"+"Then click OK.");
+				if (r == -1) return 0;
+				return ft;
+			}
+			
+			return 0;
+		} 
+		
+		public static int determineSystem3D() {
+			int ft = Dialog.flag2ft(lastShowFlag);
+			if (ft == 0 || ft == 3)
+				if ((ft = createSystemDetermineView()) == 0)
+					return -1;
+			
+			// TODO: componentize-from here
+			
+			if (univ == null) return -1;
+			
+			RoiAnalyzer3D ra3d = new RoiAnalyzer3D();
+			ra3d.directrun(univ);
+			if (!ra3d.isRectangle()) return -1;
+			
+			XY coords2d[] = ra3d.coords;
+			XY centroid2d = ra3d.centroid;
+			XYZ centroid3d = get3DCoord(centroid2d);
+			
+			if (centroid3d == null)
+				return IJX.error("No bone at centroid!", -1);
+			
+			XYZ pnts[] = new XYZ[4]; int n = 0;
+			for (int i = 0; i < 4; i++)
+				if ((pnts[i] = get3DCoord(coords2d[i])) == null)
+					if ((pnts[i] = complementFromCentroid(centroid3d, centroid2d, coords2d[i])) == null)
+						return -1;
+			
+			coords2d = new XY[4];
+			for (int i = 0; i < 4; i++)
+				coords2d[i] = pnts[i].getXYZ(ft == 1 ? "YZ" : "XY");
+			centroid2d = centroid3d.getXYZ(ft == 1 ? "YZ" : "XY");
+			
+			RotRectTool rrt = new RotRectTool(coords2d);
+			rrt.setCentroid(centroid2d);
+			XY qxy[] = rrt.toSysCoords(ft);
+			Quadrant.SysCoord.output(ft, qxy);
+			
+			// TODO: componentize-to here
 			
 			return 0;
 		}
