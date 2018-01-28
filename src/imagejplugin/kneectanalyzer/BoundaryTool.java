@@ -6,71 +6,12 @@ import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import ij.measure.Calibration;
 import ij.measure.Measurements;
+import ij.measure.ResultsTable;
 import ij.plugin.filter.ParticleAnalyzer;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 
 import java.util.ArrayList;
-
-class BoundaryData extends Rect {
-	int type, z;
-	final static int MFC = 1;
-	final static int LFC = 3;
-	final static int FEM = 2;
-	final static int TIB = 4;
-	final static int NOTCHEND = 5;
-	final static int NOTCH = 6;
-	final static int NOTCHROOF = 7;
-	final static int TIBPLATEAU = 8;
-	final static int FIB = 9;
-	final static int[] TYPES = { MFC, FEM, LFC, TIB, NOTCHEND, NOTCH, NOTCHROOF, TIBPLATEAU, FIB };
-	final static String TYPESTRING[] = { null, "mfc", "fem", "lfc", "tib", "notchend", "notch", "notchroof", "tibplateau", "fib" };
-	
-	public BoundaryData() {
-		super();
-		type = 0; z = 0;
-	}
-	public BoundaryData(int type, int z, double v[]) {
-		super(v);
-		this.type = type; this.z = z;
-	}
-	public BoundaryData(int type, int z, Rect r) {
-		super(r);
-		this.type = type; this.z = z; 
-	}
-	public BoundaryData(int type, int z, double x, double y, double w, double h) {
-		super(x, y, w, h);
-		this.type = type; this.z = z;
-	}
-	
-	public String toString() {
-		String ret = Integer.toString(this.type) + " " + Integer.toString(this.z) + " ";
-		ret += super.toString();
-		
-		return ret;
-	}
-	
-	public String getType() {
-		return TYPESTRING[this.type];
-	}
-	
-	public void draw(ImagePlus imp) {
-		imp.setSlice(this.z + 1);
-		Rect r = ((Rect)this).clone();
-		r.real2px(imp.getCalibration());
-		
-		imp.getProcessor().drawRect((int)r.x, (int)r.y, (int)r.w, (int)r.h);	
-		imp.getProcessor().drawString(this.getType(), (int)r.x, (int)r.y);
-	}
-	
-	public void fill(ImagePlus imp) {
-		imp.setSlice(this.z + 1);
-		Rect r = ((Rect)this).clone();
-		r.real2px(imp.getCalibration());
-		
-		imp.getProcessor().fillRect((int)r.x, (int)r.y, (int)r.w, (int)r.h);
-	}
-}
 
 class BoundaryList {
 	ArrayList<BoundaryData> bdlist;
@@ -172,6 +113,60 @@ class BoundaryList {
 		}
 		
 		return null;
+	}
+	
+	public int findFirstSlice() {
+		int z = Integer.MAX_VALUE;
+		for (BoundaryData bd: bdlist) {
+			z = Math.min(z, bd.z);
+		}
+		return z;
+	}
+	
+	public int findLastSlice() {
+		int z = 0;
+		for (BoundaryData bd: bdlist) {
+			z = Math.max(z, bd.z);
+		}
+		return z;
+	}
+	
+	public void toResults(String title) {
+		ResultsTable rt = IJX.getResultsTable(title);
+		if (rt != null)
+			rt.reset();
+		else
+			rt = new ResultsTable();
+		
+		int nrx = getMeanNotchRoofX();
+		rt.incrementCounter();
+		rt.addLabel("FemSplitX");
+		rt.addValue("PixelX", nrx);
+		
+		BoundaryData bd;
+		int z1 = findFirstSlice(); int z2 = findLastSlice();
+		for (int z = z1; z <= z2; z++) {
+			 for (int type: BoundaryData.TYPES) {
+				 if ((bd = find(type, z)) != null) {
+					 rt.incrementCounter();
+					 rt.addLabel(BoundaryData.TYPESTRING[type]);
+				
+					 if (type == BoundaryData.NOTCHROOF) {
+						 rt.addValue("PixelX", bd.x);
+						 rt.addValue("PixelY", bd.y);
+					 } else {
+						 rt.addValue("X", bd.x);
+						 rt.addValue("Y", bd.y);
+						 rt.addValue("Width", bd.w);
+						 rt.addValue("Height", bd.h);
+					 } 
+				
+					 rt.addValue("Slice", z);
+				 }
+			 }
+		}
+		
+		rt.show(title);
 	}
 }
 
@@ -493,7 +488,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		BoundaryData bdatNotch = bdatNE;
 		
 		int splitX = (int)((bdatL.x + bdatM.x + bdatM.w) / 2 / cal.pixelWidth);
-		int z0 = bdatNE.z, maxNRy = 0; boolean cont = true;
+		int z0 = bdatNE.z; boolean cont = true;
 		for (int z = z0; z > 0 && cont; z--) {
 			int pxdata[] = new int[H0];
 			
@@ -558,7 +553,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 							
 						BoundaryData bdatNR = new BoundaryData(BD_NOTCHROOF, z, x[1], y[1], 0, 0);
 						bdlist.add(bdatNR);
-						maxNRy = (y[1] > maxNRy) ? y[1] : maxNRy;
+						//maxNRy = (y[1] > maxNRy) ? y[1] : maxNRy;
 					}
 				} else {
 					// when the femur is too low-dense, notch is not detected in a single particle; such slice is ignored.
