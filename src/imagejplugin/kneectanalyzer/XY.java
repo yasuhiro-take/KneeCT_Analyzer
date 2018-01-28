@@ -28,12 +28,21 @@ public class XY extends Object {
 	public void real2px(Calibration cal) {
 		x /= cal.pixelWidth; y /= cal.pixelHeight;
 	}
+	public void real2px(double w, double h) {
+		x /= w; y /= h;
+	}
+	public void px2real(double w, double h) {
+		x *= w; y *= h;
+	}
 	
 	public String toString(int decimalPlace) {
 		return IJ.d2s(this.x, decimalPlace) + " " + IJ.d2s(this.y, decimalPlace);
 	}
 	public String toString(int decimalPlace, String headX, String headY) {
 		return headX + IJ.d2s(this.x, decimalPlace) + " " + headY + IJ.d2s(this.y, decimalPlace);
+	}
+	public String toString() {
+		return toString(3);
 	}
 	
 	public XY clone() {
@@ -43,6 +52,30 @@ public class XY extends Object {
 		XY xy = new XY(this);
 		xy.real2px(cal);
 		return xy;
+	}
+	public XY cloneRealized(Calibration cal) {
+		XY xy = new XY(this);
+		xy.px2real(cal);
+		return xy;
+	}
+	
+	
+	public static XY midstOf(XY xy1, XY xy2) {
+		XY m = new XY((xy1.x + xy2.x) / 2, (xy1.y + xy2.y) / 2);
+		return m;
+	}
+	
+	public static XY sub(XY xy1, XY xy2) {
+		return new XY(xy1.x - xy2.x, xy1.y - xy2.y);
+	}
+	
+	public double getLength() {
+		return Math.sqrt(x * x + y * y);
+	}
+	
+	public static double getLength(XY xy1, XY xy2) {
+		double xd = xy1.x - xy2.x, yd = xy1.y - xy2.y;
+		return Math.sqrt(xd * xd + yd * yd);
 	}
 }
 
@@ -99,6 +132,12 @@ class XYZ {
 		return this.name;
 	}
 	
+	public String toString() {
+		String ret = (name == null) ? "null " : name + " ";
+		ret += x + " " + y + " " + z;
+		return ret;
+	}
+	
 	public XY getXY() {
 		return new XY(this.x, this.y);
 	}
@@ -124,6 +163,18 @@ class XYZ {
 	}
 	public void real2px(Calibration cal) {
 		x /= cal.pixelWidth; y /= cal.pixelHeight; z /= cal.pixelDepth;
+	}
+	
+	public static XYZ sub(XYZ p1, XYZ p2) {
+		return new XYZ(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+	}
+	
+	public static XYZ add(XYZ p1, XYZ p2) {
+		return new XYZ(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z);
+	}
+	
+	public void multiply(double p) {
+		x *= p; y *= p; z *= p;
 	}
 }
 
