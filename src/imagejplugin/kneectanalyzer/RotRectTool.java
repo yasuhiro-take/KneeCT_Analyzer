@@ -11,7 +11,7 @@ public class RotRectTool {
 	double length;
 	
 	public RotRectTool(XY[] rectxy) {
-		for (int i = 0; i < 3; i++) {
+		for (int i = 0; i < 4; i++) {
 			if (i < rectxy.length)
 				this.rectxy[i] = rectxy[i].clone();
 			else
@@ -70,6 +70,10 @@ public class RotRectTool {
 	
 	public XY[] getRect() {
 		return rectxy;
+	}
+	
+	public void setCentroid(XY c) {
+		centroid = c.clone(); 
 	}
 	
 	public XY getN() {
@@ -166,6 +170,18 @@ public class RotRectTool {
 	
 	public boolean isDiagonalVertical() {
 		return (rectxy[0].x == rectxy[3].x || rectxy[1].x == rectxy[2].x);
+	}
+	
+	public XY[] toSysCoords(int ft) {
+		XY qxy[] = new XY[3];
+		if ((ft == 1 && !isUnrotatedRect()) || 
+				(ft == 2 && (isDiagonalHorizontal() || isDiagonalVertical()))) {
+			qxy[0] = getW(); qxy[1] = getN(); qxy[2] = getS();
+		} else if ((ft == 2 && !isDiagonalHorizontal() && !isDiagonalVertical()) ||
+					(ft == 1 && isUnrotatedRect())) {
+			qxy[0] = getNW(); qxy[1] = getNE(); qxy[2] = getSW();
+		} else return null;
+		return qxy;
 	}
 }
 
