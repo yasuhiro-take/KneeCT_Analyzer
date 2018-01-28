@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
+import ij.gui.GenericDialog;
 import ij.gui.Line;
 import ij.gui.RotatedRectRoi;
 import ij.gui.WaitForUserDialog;
@@ -16,6 +17,7 @@ import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
+import ij.text.TextWindow;
 
 class IJX {
 	public static ImagePlus zproject(ImagePlus stack, int start, int end) {
@@ -144,6 +146,17 @@ class IJX {
 		return null;
 	}
 	
+	public static ImagePlus getBasal() {
+		String lists[] = new String[] { "Base", "FemOnly", "TibOnly" };
+		ImagePlus imp;
+		
+		for (String w: lists) {
+			if ((imp = WindowManager.getImage(w)) != null)
+				return imp;
+		}
+		return null;
+	}
+	
 	public static String[] getWindowTitles(String regex) {
 		ArrayList<String> strlist = new ArrayList<String>();
 		String wins[] = WindowManager.getImageTitles();
@@ -157,6 +170,19 @@ class IJX {
 			return null;
 		
 		return (String[]) strlist.toArray(new String[0]);
+	}
+	
+	public static ResultsTable getResultsTable(String title) {
+		java.awt.Window win = WindowManager.getWindow(title);
+		if (win != null && win instanceof TextWindow)
+			return ((TextWindow)win).getTextPanel().getResultsTable();
+		return null;
+	}
+	
+	public static void closeResultsTable(String title) {
+		java.awt.Window win = WindowManager.getWindow(title);
+		if (win != null && win instanceof TextWindow)
+			((TextWindow)win).close(false);
 	}
 	
 	public static boolean isOpenN(String nonImageTitle) {
@@ -267,15 +293,27 @@ class IJX {
 		return ret;
 	}
 	
+	public static int getFirstSlice(ImagePlus imp) {
+		for (int s = 0; s < imp.getNSlices(); s++) {
+			byte[] array = (byte[])imp.getImageStack().getProcessor(s + 1).getPixels();
+			if (IJX.Util.getMaxAbs(array) != 0)
+				return s;
+		}
+		return -1;
+	}
+	
 	public static ImagePlus createLFCOnly(ImagePlus impFem, int nrx) {
 		ImagePlus impLFC = impFem.duplicate();
 		int H0 = impFem.getHeight();
 		
-		for (int z = 0; z < impLFC.getNSlices(); z++) {
-			ByteProcessor ip = (ByteProcessor)impLFC.getImageStack().getProcessor(z + 1);
-			ip.setColor(0);
-			ip.fillRect(0, 0, nrx, H0);
+		if (nrx > 0) {
+			for (int z = 0; z < impLFC.getNSlices(); z++) {
+				ByteProcessor ip = (ByteProcessor)impLFC.getImageStack().getProcessor(z + 1);
+				ip.setColor(0);
+				ip.fillRect(0, 0, nrx, H0);
+			}
 		}
+		
 		
 		return impLFC;
 	}
@@ -303,7 +341,8 @@ class IJX {
 	
 	public static ImagePlus createTunOnlyFem(ImagePlus impLFC, QRoiList ql) {
 		ImagePlus impSag = IJX.createAx2Sag(impLFC);
-		IJX.convertTunOnly(impSag, Quadrant.tunnelRoisFem);
+		//IJX.convertTunOnly(impSag, Quadrant.tunnelRoisFem);
+		IJX.convertTunOnly(impSag, ql);
 		ImagePlus impTun = IJX.createSag2Ax(impSag);
 		IJX.rename(impTun, "TunOnlyFem");
 		
@@ -364,7 +403,8 @@ class IJX {
 	public static void savePointList(mPointList pl, String dir, String filename) { 
 		String path = IJX.Util.createPath(dir, filename);
 		String text = pl.getPointFileText();
-		IJ.saveString(text, path);
+		if (text != null)
+			IJ.saveString(text, path);
 	}
 	
 	public static mPointList loadPointList(String dir, String file) {
@@ -394,6 +434,49 @@ class IJX {
 			}
 		}
 		return pl;	
+	}
+	
+	public static boolean[] generalFTDialog(String title, String msg, String suffix, boolean f, boolean t, boolean[] defaultvalue) {
+		if (f == false && t == false)
+			return null;
+		
+		GenericDialog gd = new GenericDialog(title);
+		gd.addMessage(msg);
+		if (f) 	gd.addCheckbox("Femoral "+suffix, defaultvalue[0]);
+		if (t)  gd.addCheckbox("Tibial "+suffix, defaultvalue[1]);
+		gd.showDialog();
+		
+		if (gd.wasCanceled()) 
+			return null;
+		
+		boolean ret[] = new boolean[2];
+		
+		ret[0] = (f) ? gd.getNextBoolean() : false; 
+		ret[1] = (t) ? gd.getNextBoolean() : false;
+		
+		return ret;
+	}
+	public static boolean[] generalFTDialog(String title, String msg, String suffix, boolean ft[], boolean[] defaultvalue) {
+		return generalFTDialog(title, msg, suffix, ft[0], ft[1], defaultvalue);
+	}
+	
+	public static int radiobuttonFTDialog(String title, String msg, String suffix) {
+		GenericDialog gd = new GenericDialog(title);
+		gd.addMessage(msg);
+		String items[] = new String[2];
+		items[0] = "Femoral "+ (suffix != null ? suffix : "");
+		items[1] = "Tibial "+ (suffix != null ? suffix : "");
+		gd.addRadioButtonGroup(null, items, 2, 1, items[0]);
+		gd.showDialog();
+		
+		if (gd.wasCanceled()) 
+			return 0;
+		
+		String r = gd.getNextRadioButton();
+		if (r.equals(items[0])) return 1;
+		if (r.equals(items[1])) return 2;
+		
+		return 0;
 	}
 	
 	static class Util {
