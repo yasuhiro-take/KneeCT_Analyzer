@@ -243,7 +243,7 @@ public class QuadrantAnalysisGUI {
 			String msg;
 			if (IJIF.checkModels("FemOnly", "TibOnly")) {
 				if (IJIF.hasBoundaryData()) {
-					int qsystem = Quadrant.systemDetermined();
+					int qsystem = Quadrant.SysCoord.getDetermined();
 					msg = "Model data OK.\n";
 					msg += "Available Quadrant system: " + quadStatus[qsystem] + ".\n";
 					
@@ -274,7 +274,7 @@ public class QuadrantAnalysisGUI {
 		case 2:
 		 {
 			String msg = null;
-			int qsystem = Quadrant.systemDetermined();
+			int qsystem = Quadrant.SysCoord.getDetermined();
 			if (qsystem == 3) {
 				msg = "Quadrant coordinates were successfully determined. ";
 				msg += "You may want to proceed to *" + btntitles[2] + "*.";
@@ -344,7 +344,7 @@ public class QuadrantAnalysisGUI {
 		case 2: {
 			String msg;
 			if (IJIF.checkModels("FemOnly", "TibOnly")) {
-				int qsystem = Quadrant.systemDetermined();
+				int qsystem = Quadrant.SysCoord.getDetermined();
 				msg = "Model data OK.\n";
 				msg += "Determined Quadrant System: " + quadStatus[qsystem] + ".\n";
 				
@@ -489,10 +489,10 @@ public class QuadrantAnalysisGUI {
 				
 				break;
 			case '1':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D();
+				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D(true);
 				break;
 			case '2':
-				r = IJIF.Quad.determineSystem2D();
+				r = (mode2D3D == 1) ? IJIF.Quad.determineSystem2D() : IJIF3D.Quad.determineSystem3D();
 				break;
 			case '3':
 				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
