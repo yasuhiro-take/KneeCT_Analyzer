@@ -35,8 +35,6 @@ public class IJIF implements Measurements {
 	
 	private static mPointList fec;
 	
-	static BoundaryList bdatList;
-	static int notchRoofX;
 	static double minThreshold, maxThreshold;
 	
 	//private static double TPangle;
@@ -44,8 +42,12 @@ public class IJIF implements Measurements {
 	private static boolean initializedFlag;
 	
 	private static final String FILENAME_FEC = "fec.points";
+	private static final String FILENAME_BOUNDARY = "boundary.txt";
 	
 	private static final String MD_THRESHOLD = "Threshold";
+	public static final String WINTITLE_BOUNDARY = "Anatomic Boundary"; // when modified, change Quadrant.java too.
+	
+	private static final String BD_TYPE[] = BoundaryData.TYPESTRING;
 	
 	public static void initIJIF() {
 		if (IJ.getInstance() == null)
@@ -54,9 +56,7 @@ public class IJIF implements Measurements {
 		if (initializedFlag)
 			return;
 		
-		bdatList = null;
 		fec = null;
-		notchRoofX = 0;
 		//TPangle = 0;
 		initializedFlag = true;
 		minThreshold = maxThreshold = 0;
@@ -84,7 +84,7 @@ public class IJIF implements Measurements {
 	}
 	
 	public static boolean hasBoundaryData() {
-		return (IJIF.bdatList != null);
+		return (IJX.getResultsTable(WINTITLE_BOUNDARY) != null);
 	}
 	
 	public static boolean checkModels(String... models) {
@@ -189,7 +189,7 @@ public class IJIF implements Measurements {
 		return basepath;
 	}
 	
-	private static Calibration parseMetadata(String filedata, Calibration cal) {
+	private static Calibration parseMetadata(String filedata, Calibration cal, boolean toResults) {
 		String voxel = null;
 		//String lines[] = filedata.split(System.getProperty("line.separator"));
 		String lines[] = filedata.split("\n");
@@ -206,8 +206,11 @@ public class IJIF implements Measurements {
 					}
 					lines[i] = null;
 				} else {
-					IJIF.bdatList = new BoundaryList(lines);
-					IJIF.notchRoofX = bdatList.getMeanNotchRoofX();
+					if (toResults) {
+						BoundaryList bl = new BoundaryList(lines);
+						bl.toResults(WINTITLE_BOUNDARY);
+					}	
+					
 					i = lines.length;
 				}
 			}
@@ -227,14 +230,7 @@ public class IJIF implements Measurements {
 		return cal;
 	}
 	
-	public static int getFirstSlice(ImagePlus imp) {
-		for (int s = 0; s < imp.getNSlices(); s++) {
-			byte[] array = (byte[])imp.getImageStack().getProcessor(s + 1).getPixels();
-			if (IJX.Util.getMaxAbs(array) != 0)
-				return s;
-		}
-		return -1;
-	}
+	
 	
 	private static Rect[] findMaxParticlePerSlice(ImagePlus imp) {
 		AnalyzeParticle ap = new AnalyzeParticle(300, imp.getCalibration(), "Area BX BY Width Height");
@@ -393,12 +389,13 @@ public class IJIF implements Measurements {
 		
 		if (!srf.wasOK)
 			return 0;
-	
+		
 		int w = impTibSag.getWidth(), h = impTibSag.getHeight();
-			
-		BoundaryData bd = bdatList.findProximal(BoundaryData.FIB);
+		
+		RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
+		BoundaryData bd = rtb.getProximal(BD_TYPE[BoundaryData.FIB]);
 		if (bd == null)
-			bd = bdatList.findDistal(BoundaryData.TIB);
+			bd = rtb.getDistal(BD_TYPE[BoundaryData.TIB]);
 			
 		XY fibYZ = new XY((bd.y + bd.h) / cal.pixelWidth, bd.z);
 		XY center = new XY(w / 2, h / 2);
@@ -411,7 +408,6 @@ public class IJIF implements Measurements {
 		ImageStack ims = impTibSag.getImageStack().crop(0, 0, 0, w, z, impTibSag.getNSlices());
 		impTibSag.setStack(ims);
 		
-		//ImagePlus impTP = OrthogonalTransformer.reslice(impTibSag, cal.pixelDepth, "Top rotate");
 		ImagePlus impTP = IJX.createSag2Ax(impTibSag);
 		IJ.setThreshold(impTP, 64, 255, null); // TODO: threshold by user-defined ??
 		IJ.run(impTP, "Make Binary", "method=Default background=Default");
@@ -430,48 +426,7 @@ public class IJIF implements Measurements {
 		return impFem;
 	}
 	
-	private static boolean[] generalFTDialog(String title, String msg, String suffix, boolean f, boolean t, boolean[] defaultvalue) {
-		if (f == false && t == false)
-			return null;
-		
-		GenericDialog gd = new GenericDialog(title);
-		gd.addMessage(msg);
-		if (f) 	gd.addCheckbox("Femoral "+suffix, defaultvalue[0]);
-		if (t)  gd.addCheckbox("Tibial "+suffix, defaultvalue[1]);
-		gd.showDialog();
-		
-		if (gd.wasCanceled()) 
-			return null;
-		
-		boolean ret[] = new boolean[2];
-		
-		ret[0] = (f) ? gd.getNextBoolean() : false; 
-		ret[1] = (t) ? gd.getNextBoolean() : false;
-		
-		return ret;
-	}
-	private static boolean[] generalFTDialog(String title, String msg, String suffix, boolean ft[], boolean[] defaultvalue) {
-		return generalFTDialog(title, msg, suffix, ft[0], ft[1], defaultvalue);
-	}
 	
-	public static int radiobuttonFTDialog(String title, String msg, String suffix) {
-		GenericDialog gd = new GenericDialog(title);
-		gd.addMessage(msg);
-		String items[] = new String[2];
-		items[0] = "Femoral "+ (suffix != null ? suffix : "");
-		items[1] = "Tibial "+ (suffix != null ? suffix : "");
-		gd.addRadioButtonGroup(null, items, 2, 1, items[0]);
-		gd.showDialog();
-		
-		if (gd.wasCanceled()) 
-			return 0;
-		
-		String r = gd.getNextRadioButton();
-		if (r.equals(items[0])) return 1;
-		if (r.equals(items[1])) return 2;
-		
-		return 0;
-	}
 	
 	
 	
@@ -498,13 +453,25 @@ public class IJIF implements Measurements {
 			ret++;
 			
 			notice("Loading metadata...");
+			
+			boolean rtboundary = false;
+			if (IJX.Util.doesFileExist(dir, FILENAME_BOUNDARY)) {
+				IJX.closeResultsTable(WINTITLE_BOUNDARY);
+				
+				ResultsTable rt = ResultsTable.open2(IJX.Util.createPath(dir, FILENAME_BOUNDARY));
+				if (rt != null) {
+					rt.show(WINTITLE_BOUNDARY);
+					rtboundary = true;
+				}
+			}
+			
 			String filedata;
 			if (IJX.Util.doesFileExist(dir, "metadata.txt")) 
 				filedata = IJ.openAsString(IJX.Util.createPath(dir, "metadata.txt"));
 			 else 
 				filedata = IJ.openAsString(IJX.Util.createPath(dir, "Voxel.txt"));
 				
-			Calibration cal = parseMetadata(filedata, imp.getCalibration());
+			Calibration cal = parseMetadata(filedata, imp.getCalibration(), rtboundary == false);
 			imp.setCalibration(cal);
 			
 			IJIF.fec = null;
@@ -533,8 +500,6 @@ public class IJIF implements Measurements {
 	
 	public static int closeWorkingFiles(String... wintitles) {
 		IJIF.fec = null;
-		IJIF.bdatList = null;
-		IJIF.notchRoofX = 0;
 		
 		for (String win: wintitles) 
 			IJX.forceClose(win);
@@ -552,9 +517,9 @@ public class IJIF implements Measurements {
 		if (IJ.isResultsWindow())
 			ResultsTable.getResultsWindow().close(false);
 		
-		java.awt.Window win = WindowManager.getWindow("Results3D");
-		if (win != null && win instanceof TextWindow)
-			((TextWindow)win).close(false);
+		IJX.closeResultsTable("Results3D");
+		IJX.closeResultsTable(WINTITLE_BOUNDARY);
+		IJX.closeResultsTable(Quadrant.WINTITLE_RTQUAD);
 		
 		if (ij3d)
 			IJIF3D.close();
@@ -595,11 +560,15 @@ public class IJIF implements Measurements {
 						String LF = System.getProperty("line.separator");
 						String outStr = IJX.getVoxelSizeAsString(imp) + LF;
 						outStr += IJX.Util.metadata(MD_THRESHOLD, minThreshold, maxThreshold) + LF;
-						
+						/*
 						if (IJIF.bdatList != null)
 							outStr += bdatList.toString(); 
-									
+							*/
 						IJ.saveString(outStr, IJX.Util.createPath(basepath, "metadata.txt"));
+						
+						ResultsTable rt = IJX.getResultsTable(WINTITLE_BOUNDARY);
+						if (rt != null)
+							rt.save(IJX.Util.createPath(basepath, FILENAME_BOUNDARY));
 					
 						if (IJIF.fec != null && IJIF.fec.size() >= 2)
 							IJX.savePointList(IJIF.fec, basepath, IJIF.FILENAME_FEC);
@@ -749,6 +718,8 @@ public class IJIF implements Measurements {
 			
 			bt.drawMulti(imp2, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
 			
+			bt.toResults(WINTITLE_BOUNDARY);
+			
 			notice(null);
 			notice("Review the created image; then click OK or press ESC key.");
 			
@@ -770,9 +741,6 @@ public class IJIF implements Measurements {
 			
 			ImagePlus impTib = createTibOnly(imp, bt); impTib.show();
 			ImagePlus impFem = createFemOnly(imp, impTib); impFem.show();  
-			
-			IJIF.bdatList = bt;
-			IJIF.notchRoofX = nrx;
 			
 			return 0;
 		}
@@ -799,12 +767,75 @@ public class IJIF implements Measurements {
 		}
 	
 		public static int detectSystem2D() {
-			boolean pre[] = new boolean[] { (Quadrant.systemCoordFem == null), (Quadrant.systemCoordTib == null) };
-			boolean boo[] = generalFTDialog("Choice", "Check below for automatic identification of quadrant coord system.", 
+			int quadsys = Quadrant.SysCoord.getDetermined();
+			boolean pre[] = new boolean[] { ((quadsys & 1) == 0), ((quadsys & 2) == 0) };
+			boolean boo[] = IJX.generalFTDialog("Choice", "Check below for automatic identification of quadrant coord system.", 
 											"Quadrant System", true, true, pre);
+			if (boo == null) return -1;
+			boolean fem = boo[0], tib = boo[1];
+			
+			if (fem) {
+				IJIF.notice("Analyzing femur...This may take some time...");
+				Quadrant.detectFemoralSystem();
+			}
+			if (tib) {
+				IJIF.notice("Analyzing tibia...This may take some time...");
+				Quadrant.detectTibialSystem();
+			}
+				
+			return 0;
+		}
+		
+		public static int detectTunnel2D() {
+			int quadsys = Quadrant.SysCoord.getDetermined();
+			boolean pre[] = new boolean[] { ((quadsys & 1) != 0), ((quadsys & 2) != 0) };
+			//boolean pre[] = new boolean[] { (Quadrant.systemCoordFem != null), (Quadrant.systemCoordTib != null) };
+			boolean boo[] = IJX.generalFTDialog("Choice", "Check below for automatic tunnel detection.", 
+											"Tunnel", pre, pre);
 			if (boo == null)
 				return -1;
 			
+			boolean fem = boo[0], tib = boo[1];
+			
+			IJ.run("Set Measurements...", "area centroid display redirect=None decimal=3");
+			ResultsTable rtable = ResultsTable.getResultsTable();
+			if (rtable != null) rtable.reset();
+			
+			int rf = 0, rt = 0;
+			if (fem) {
+				IJIF.notice("Analyzing femoral tunnel...This may take some time...");
+				rf = Quadrant.detectFemoralTunnel();
+			}
+			if (tib) {
+				IJIF.notice("Analyzing tibial tunnel...This may take some time...");
+				rt = Quadrant.detectTibialTunnel();
+			}
+			
+			Quadrant.measurements2Coord();
+
+			if (rf == 0 && rt == 0)
+				return 0;
+			return -1;
+		}
+		
+		public static int refreshResults2D() {
+			Quadrant.measurements2Coord();
+			Quadrant.syncWithResults();
+			return 0;
+		}
+		
+		public static int determineSystem2D() {
+			Quadrant.setSystem();
+			return 0;
+		}
+		/* 
+		 * After detecting q-system, dialog appeaered to ask if user agree with it.
+		public static int detectSystem2D() {
+			int quadsys = Quadrant.SysCoord.getDetermined();
+			boolean pre[] = new boolean[] { ((quadsys & 1) == 0), ((quadsys & 2) == 0) };
+			boolean boo[] = generalFTDialog("Choice", "Check below for automatic identification of quadrant coord system.", 
+											"Quadrant System", true, true, pre);
+			if (boo == null) return -1;
 			boolean fem = boo[0], tib = boo[1];
 			
 			ImagePlus impF = null, impT = null;
@@ -834,11 +865,8 @@ public class IJIF implements Measurements {
 												(impF != null), (impT != null), new boolean[] {true,true});
 				if (boo2 == null) return -1;
 				
-				if (fem && !boo2[0])
-					Quadrant.systemCoordFem = null;
-								
-				if (tib && !boo2[1])
-					Quadrant.systemCoordTib = null;
+				if (fem && !boo2[0]) Quadrant.systemCoordFem = null;
+				if (tib && !boo2[1]) Quadrant.systemCoordTib = null;
 				
 				IJX.forceClose(impC);
 				
@@ -846,42 +874,8 @@ public class IJIF implements Measurements {
 					return 0;
 			}
 			return -1;
-		}
+		}*/
 		
-		public static int detectTunnel2D() {
-			boolean pre[] = new boolean[] { (Quadrant.systemCoordFem != null), (Quadrant.systemCoordTib != null) };
-			boolean boo[] = generalFTDialog("Choice", "Check below for automatic tunnel detection.", 
-											"Tunnel", pre, pre);
-			if (boo == null)
-				return -1;
-			
-			boolean fem = boo[0], tib = boo[1];
-			
-			IJ.run("Set Measurements...", "area centroid display redirect=None decimal=3");
-			ResultsTable rtable = ResultsTable.getResultsTable();
-			if (rtable != null) rtable.reset();
-			
-			int rf = 0, rt = 0;
-			if (fem) rf = Quadrant.detectFemoralTunnel(notchRoofX);
-			if (tib) rt = Quadrant.detectTibialTunnel();
-			
-			Quadrant.measurements2Coord();
-
-			if (rf == 0 && rt == 0)
-				return 0;
-			return -1;
-		}
-		
-		public static int refreshResults2D() {
-			Quadrant.measurements2Coord();
-			Quadrant.syncWithResults();
-			return 0;
-		}
-		
-		public static int determineSystem2D() {
-			Quadrant.setSystem(notchRoofX);
-			return 0;
-		}
 	}
 }
 
