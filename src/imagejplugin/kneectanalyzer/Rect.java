@@ -69,4 +69,15 @@ public class Rect extends Object {
 		ret += Double.toString(this.h);
 		return ret;
 	}
+	
+	public XY[] toCoordsPx() {
+		XY ret[] = new XY[4];
+		
+		ret[0].x = x; ret[0].y = y;
+		ret[1].x = x + w - 1; ret[1].y = y;
+		ret[2].x = x; ret[2].y = y + h - 1;
+		ret[3].x = x + w - 1; ret[1].y = y + h - 1;
+		
+		return ret;
+	}
 }
