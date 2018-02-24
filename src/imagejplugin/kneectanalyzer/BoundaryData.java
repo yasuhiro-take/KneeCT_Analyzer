@@ -1,6 +1,10 @@
 package imagejplugin.kneectanalyzer;
 
 import ij.ImagePlus;
+import ij.gui.Overlay;
+import ij.gui.Roi;
+import ij.gui.TextRoi;
+import ij.measure.Calibration;
 
 public class BoundaryData extends Rect {
 	int type, z;
@@ -14,7 +18,7 @@ public class BoundaryData extends Rect {
 	final static int TIBPLATEAU = 8;
 	final static int FIB = 9;
 	final static int[] TYPES = { MFC, FEM, LFC, TIB, NOTCHEND, NOTCH, NOTCHROOF, TIBPLATEAU, FIB };
-	final static String TYPESTRING[] = { null, "mfc", "fem", "lfc", "tib", "notchend", "notch", "notchroof", "tibplateau", "fib" };
+	final static String TYPESTRING[] = { "unknown", "mfc", "fem", "lfc", "tib", "notchend", "notch", "notchroof", "tibplateau", "fib" };
 	
 	public BoundaryData() {
 		super();
@@ -25,6 +29,10 @@ public class BoundaryData extends Rect {
 		this.type = type; this.z = z;
 	}
 	public BoundaryData(int type, int z, Rect r) {
+		super(r);
+		this.type = type; this.z = z; 
+	}
+	public BoundaryData(int type, int z, java.awt.Rectangle r) {
 		super(r);
 		this.type = type; this.z = z; 
 	}
@@ -48,7 +56,7 @@ public class BoundaryData extends Rect {
 		for (int i = 1; i < TYPESTRING.length; i++)
 			if (TYPESTRING[i].equals(type))
 				return i;
-		return -1;
+		return 0;
 	}
 	
 	public void draw(ImagePlus imp) {
@@ -59,6 +67,7 @@ public class BoundaryData extends Rect {
 		imp.getProcessor().drawRect((int)r.x, (int)r.y, (int)r.w, (int)r.h);	
 		imp.getProcessor().drawString(this.getTypeString(), (int)r.x, (int)r.y);
 	}
+	
 	
 	public void fill(ImagePlus imp) {
 		imp.setSlice(this.z + 1);
