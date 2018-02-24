@@ -131,6 +131,18 @@ class BoundaryList {
 		return z;
 	}
 	
+	public void real2px(Calibration cal) {
+		for (BoundaryData bd: bdlist)
+			if (bd.type != BoundaryData.NOTCHROOF)
+				bd.real2px(cal);
+	}
+	
+	public void px2real(Calibration cal) {
+		for (BoundaryData bd: bdlist)
+			if (bd.type != BoundaryData.NOTCHROOF)
+				bd.px2real(cal);
+	}
+	
 	public void toResults(String title) {
 		ResultsTable rt = IJX.getResultsTable(title);
 		if (rt != null)
