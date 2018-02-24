@@ -61,6 +61,20 @@ public class RTBoundary {
 		return imax;
 	}
 	
+	public int find(int type, int z) {
+		if (rt == null) return -1;
+		
+		for (int i = 0; i < rt.size(); i++) {
+			if (rt.getLabel(i).equals(type)) {
+				int v = (int)rt.getValue("Slice", i);
+				if (z == v)
+					return i;
+			}
+		}
+		
+		return -1;
+	}
+	
 	public BoundaryData getProximal(String type) {
 		int imin = findProximal(type);
 		
@@ -83,6 +97,35 @@ public class RTBoundary {
 			return new BoundaryData(typevalue, z, getRect(imax));
 		}
 		return null;
+	}
+	
+	public BoundaryData getProximal(int type) {
+		return getProximal(BoundaryData.TYPESTRING[type]);
+	}
+	public BoundaryData getDistal(int type) {
+		return getDistal(BoundaryData.TYPESTRING[type]);
+	}
+	
+	public BoundaryData get(int type, int z) {
+		int i = find(type, z);
+		
+		if (i != -1)
+			return new BoundaryData(type, z, getRect(i));
+		return null;
+	}
+	
+	public BoundaryList getMulti(int z) {
+		if (rt == null) return null;
+		
+		BoundaryList bl = new BoundaryList();
+		for (int i = 0; i < rt.size(); i++) {
+			int s = (int)rt.getValue("Slice", i);
+			if (s == z) 
+				bl.bdlist.add(getOne(i));
+				
+		}
+		
+		return bl;
 	}
 	
 	public int getProximalSlice(String type) {
@@ -109,6 +152,15 @@ public class RTBoundary {
 		
 		return new Rect(x,y,w,h);
 	}
+	
+	public BoundaryData getOne(int row) {
+		int z = (int)rt.getValue("Slice", row) - 1;
+		String type = rt.getLabel(row);
+		int typevalue = BoundaryData.getType(type);
+		
+		return new BoundaryData(typevalue, z, getRect(row));
+	}
+	
 	
 	public void getNotchRoofYZ(ArrayList<Double> yl, ArrayList<Double> zl) {
 		if (rt == null) return ;
