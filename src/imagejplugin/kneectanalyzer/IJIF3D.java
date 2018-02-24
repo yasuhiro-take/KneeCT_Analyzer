@@ -6,9 +6,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Vector;
 
-import javax.media.j3d.View;
 import javax.vecmath.Color3f;
-import javax.vecmath.Point3d;
+import org.scijava.vecmath.Point3d;
+import org.scijava.java3d.View;
+
 
 import vib.BenesNamedPoint;
 import vib.PointList;
@@ -85,7 +86,8 @@ public class IJIF3D {
 			}
 		}
 		
-		c = univ.addMesh(grey, color, name, 50, channels, 2);
+		//c = univ.addMesh(grey, color, name, 50, channels, 2);
+		c = univ.addMesh(grey);
 		
 		if (c != null && !contentNames.contains(name))
 			contentNames.add(name);
@@ -154,7 +156,7 @@ public class IJIF3D {
 	
 	static XYZ get3DCoord(int x, int y, Picker picker, Content c) {
 		if (picker != null && c != null) {
-			Point3d pnt = picker.getPickPointGeometry(c, x, y);
+			org.scijava.vecmath.Point3d pnt = picker.getPickPointGeometry(c, x, y);
 			if (pnt != null)
 				return new XYZ(pnt.x, pnt.y, pnt.z);
 		}
