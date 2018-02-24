@@ -45,7 +45,7 @@ public class IJIF implements Measurements {
 	private static final String FILENAME_BOUNDARY = "boundary.txt";
 	
 	private static final String MD_THRESHOLD = "Threshold";
-	public static final String WINTITLE_BOUNDARY = "Anatomic Boundary"; // when modified, change Quadrant.java too.
+	public static final String WINTITLE_BOUNDARY = AnatomyDetector.WINTITLE_BOUNDARY;
 	
 	private static final String BD_TYPE[] = BoundaryData.TYPESTRING;
 	
@@ -302,10 +302,13 @@ public class IJIF implements Measurements {
 		
 		
 		int[] slices = getMaximaParticleSlices(b_area);
+		String msg = "Please choose the most probable epicondyle-containing slice.";
 		
-		SliceChooseFilter scf = new SliceChooseFilter(slices);
+		SliceChooseFilter scf = new SliceChooseFilter(slices, "Select Epicondyle Slice", msg);			 
+		
 		imp.getWindow().toFront();
 		WindowManager.setCurrentWindow(imp.getWindow());
+		
 		new PlugInFilterRunner(scf, null, null);
 		
 		if (!scf.wasOK)
@@ -327,55 +330,7 @@ public class IJIF implements Measurements {
 		return 0;
 	}
 	
-	private static ImagePlus createTibOnly(ImagePlus imp, BoundaryList bl) {
-		ImagePlus impTib = imp.duplicate();
-		IJX.rename(impTib, "TibOnly");
-		Calibration cal = impTib.getCalibration();
-		int W0 = imp.getWidth(), H0 = imp.getHeight();
-		
-		int zM = bl.findDistal(BoundaryData.MFC).z;
-		int zL = bl.findDistal(BoundaryData.LFC).z;
-		int zT = bl.findProximal(BoundaryData.TIB).z;
-		
-		for (int z = 0; z < zT; z++) {
-			ByteProcessor ip = (ByteProcessor)impTib.getImageStack().getProcessor(z + 1);
-			ip.setColor(0);
-			ip.fillRect(0, 0, W0, H0);
-		}
-		
-		for (int z = zT; z <= Math.max(zM, zL); z++) {
-			impTib.setSliceWithoutUpdate(z + 1);
-			ByteProcessor ip = (ByteProcessor)impTib.getProcessor();
-			ip.setColor(0);
-			
-			BoundaryData bd = bl.find(BoundaryData.MFC, z);
-			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				ip.fillRect((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-			}
-			
-			bd = bl.find(BoundaryData.LFC, z);
-			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				ip.fillRect((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-			}
-			
-			bd = bl.find(BoundaryData.TIB, z);
-			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				
-				imp.setSliceWithoutUpdate(z + 1);
-				imp.setRoi((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-				imp.copy();
-				imp.killRoi();
-				impTib.setRoi((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-				impTib.paste();
-				impTib.killRoi();
-			}
-		}
-		
-		return impTib;
-	}
+	
 	
 	public static double createTibPlateau(ImagePlus impTibSag) {
 		IJ.run(impTibSag, "Fill Holes", "stack");
@@ -417,18 +372,6 @@ public class IJIF implements Measurements {
 			
 		return srf.angle;
 	}
-	
-	private static ImagePlus createFemOnly(ImagePlus imp, ImagePlus impTib) {
-		ImageCalculator ic = new ImageCalculator();
-		
-		ImagePlus impFem = ic.run("XOR create stack", imp, impTib);
-		IJX.rename(impFem, "FemOnly");
-		return impFem;
-	}
-	
-	
-	
-	
 	
 	/*
 	 * Interface for dialog buttons 
@@ -690,57 +633,21 @@ public class IJIF implements Measurements {
 		}
 		
 		public static int autoEdit() {
-			notice("Analyzing...");
-			
 			ImagePlus imp = WindowManager.getImage("Base");
 			if (fec == null) {
 				int r = determineFemEpiCondylesBy2D(imp);
 				if (r == -1) return -1;
 			}
-					
-			BoundaryTool bt = new BoundaryTool(imp);
-			bt.scanFemur(fec.toArray());
-			bt.scanProxTibia();
-			bt.scanDistalTibia();
-			bt.scanProxNotch();
 			
-			int nrx = bt.getMeanNotchRoofX();
-			int z2 = bt.findDistal(BoundaryData.NOTCH).z;
-			
-			ImagePlus imp2 = imp.duplicate(); imp2.show();
-			
-			for (int z = 0; z <= z2; z++) {
-				ByteProcessor ip = (ByteProcessor)imp2.getImageStack().getProcessor(z + 1);
-				
-				ip.setColor(128);
-				ip.drawLine(nrx, 0, nrx, imp2.getHeight() - 1);
-			}
-			
-			bt.drawMulti(imp2, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
-			
-			bt.toResults(WINTITLE_BOUNDARY);
-			
-			notice(null);
-			notice("Review the created image; then click OK or press ESC key.");
-			
-			String msg = "To create isolated bone models (FemOnly and TibOnly),\n";
-			msg += "MFC, LFC,Tibial spine and plateau, and splitting line between MFC and LFC are\n";
-			msg += "machinary identified at the notch-level slices.\n";
-			msg += "Please review the image; if you agree, press OK. If not, press ESC key.";
-			
-			int r = IJX.WaitForUser(msg);
-			
-			bt.close();
+			AnatomyDetector ad = new AnatomyDetector();
+			int r = ad.directRun(imp, fec.toArray());
 			
 			if (r == -1) return -1;
-			
-			IJX.forceClose(imp2);
 			
 			notice(null);
 			notice("Creating isolated bone models...\nThis may take some time...");
 			
-			ImagePlus impTib = createTibOnly(imp, bt); impTib.show();
-			ImagePlus impFem = createFemOnly(imp, impTib); impFem.show();  
+			(new FTDivider()).directRun(imp);
 			
 			return 0;
 		}
@@ -885,70 +792,6 @@ abstract class IJIF_SwingWorker extends SwingWorker<Integer, String> {
 }
 
 
-class SliceChooseFilter implements ExtendedPlugInFilter, DialogListener {
-	private int index;
-	private final int[] sliceChoices;
-	private ImagePlus imp;
-	public boolean wasOK;
-	
-	public SliceChooseFilter(int[] sliceChoices) {
-		this.sliceChoices = sliceChoices;
-	}
-	public int getChoice() {
-		return index;
-	}
-	 
-	@Override
-	public int setup(String arg, ImagePlus imp) {
-		this.index = 0;
-		this.imp = imp;
-		this.wasOK = false;
-		
-		return DOES_ALL | STACK_REQUIRED | NO_CHANGES;
-	}
-
-	@Override
-	public void run(ImageProcessor ip) {
-		imp.setSlice(sliceChoices[index] + 1);		
-	}
-
-	@Override
-	public boolean dialogItemChanged(GenericDialog gd, AWTEvent e) {
-		//index = gd.getNextChoiceIndex();
-		Vector<Scrollbar> slider = gd.getSliders();
-		index = slider.get(0).getValue() - 1;
-		
-		return true;
-	}
-
-	@Override
-	public int showDialog(ImagePlus imp, String command, PlugInFilterRunner pfr) {
-		String items[] = new String[sliceChoices.length];
-		for (int i = 0; i < items.length; i++)
-			items[i] = Integer.toString(sliceChoices[i] + 1);
-		
-		GenericDialog gd = new GenericDialog("Select Epicondyle Slice");
-		gd.addMessage("XYZ of femoral epicondyles are mandatory\n"+
-					"for Auto-editting, but yet to be determined.\n"+
-					 "In fact, Near-by points are satisfactory.\n" +
-					 "Please choose one epicondyle-containing slice\n"+
-					 "from machinary-identified candidates.\n");
-		
-		//gd.addChoice("Slice#: ", items, items[0]);
-		gd.addSlider("Slice choice: ", 1, items.length, 1);
-		gd.addPreviewCheckbox(pfr);
-		gd.addDialogListener(this);
-		gd.getPreviewCheckbox().setState(true);
-		gd.showDialog();
-		
-		if (gd.wasOKed())
-			wasOK = true;
-		
-		return 0;
-	}
-
-	@Override public void setNPasses(int nPasses) {}
-}
 
 class SimpleRotateFilter implements ExtendedPlugInFilter, DialogListener {
 	public boolean wasOK;
