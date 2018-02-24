@@ -18,6 +18,10 @@ public class Rect extends Object {
 		x = x2; y = y2; w = w2; h = h2;
 	}
 	public Rect(java.awt.Rectangle r) {
+		set(r);
+	}
+	
+	public void set(java.awt.Rectangle r) {
 		x = r.x; y = r.y; w = r.width; h = r.height;
 	}
 	
@@ -40,6 +44,12 @@ public class Rect extends Object {
 		return false;
 	}
 	
+	boolean equals(java.awt.Rectangle r) {
+		if (r != null && r.x == x && r.y == y && r.width == w && r.height == h)
+			return true;
+		return false;
+	}
+	
 	public XY getCenter() {
 		return new XY(this.x + this.w / 2, this.y + this.h / 2);
 	}
@@ -49,8 +59,10 @@ public class Rect extends Object {
 		y *= cal.pixelHeight; h *= cal.pixelHeight; 
 	}
 	public void real2px(Calibration cal) {
-		x /= cal.pixelWidth; w /= cal.pixelWidth;
-		y /= cal.pixelHeight; h /= cal.pixelHeight; 
+		x = (int)(x / cal.pixelWidth + 0.5); 
+		w = (int)(w / cal.pixelWidth + 0.5);
+		y = (int)(y / cal.pixelHeight + 0.5);
+		h = (int)(h / cal.pixelHeight + 0.5); 
 	}
 	public Rect clone() {
 		return new Rect(this);
