@@ -232,7 +232,7 @@ class Quadrant  {
 	static final String WINTITLES[] = new String[] { null, WINTITLE_FEM2D, WINTITLE_TIB2D };
 	static final String WINTITLES3D[] = new String[] { null, WINTITLE_FEM2D+"3D", WINTITLE_TIB2D+"3D" };
 	static final String WINTITLE_RTQUAD = "Quadrant System RefCoords";
-	static final String WINTITLE_BOUNDARY = "Anatomic Boundary"; // should be equal to IJIF.java
+	static final String WINTITLE_BOUNDARY = AnatomyDetector.WINTITLE_BOUNDARY;
 	static final String XYZSTR[] = new String[] { null, "YZ", "XY" }; 
 	private static final String FILENAME_FEMQ = "femQuad.points";
 	private static final String FILENAME_TIBQ = "tibQuad.points";
