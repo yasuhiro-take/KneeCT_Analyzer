@@ -13,18 +13,52 @@ public static String runKCAMacroS(String macroname, String arg) {
 	}
 	
 public int __autoEdit() {
-		String arg = getFECString();
-		if (arg == null)
-			return error("FEC is not set yet.", -1);
+		/*		
+			BoundaryTool bt = new BoundaryTool(imp);
+			bt.scanFemur(fec.toArray());
+			bt.scanProxTibia();
+			bt.scanDistalTibia();
+			bt.scanProxNotch();
+			
+			int nrx = bt.getMeanNotchRoofX();
+			int z2 = bt.findDistal(BoundaryData.NOTCH).z;
+			
+			ImagePlus imp2 = imp.duplicate(); imp2.show();
+			
+			for (int z = 0; z <= z2; z++) {
+				ByteProcessor ip = (ByteProcessor)imp2.getImageStack().getProcessor(z + 1);
+				
+				ip.setColor(128);
+				ip.drawLine(nrx, 0, nrx, imp2.getHeight() - 1);
+			}
+			
+			//bt.drawMulti(imp2, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
+			
+			
+			bt.real2px(imp.getCalibration());
+			new BoundaryOverlayer(imp, bt, BoundaryData.MFC, BoundaryData.LFC, BoundaryData.TIB, BoundaryData.NOTCH);
+			
+			
+			bt.toResults(WINTITLE_BOUNDARY);
+			
+			notice(null);
+			notice("Review the created image; then click OK or press ESC key.");
+			
+			String msg = "To create isolated bone models (FemOnly and TibOnly),\n";
+			msg += "MFC, LFC,Tibial spine and plateau, and splitting line between MFC and LFC are\n";
+			msg += "machinary identified at the notch-level slices.\n";
+			msg += "Please review the image; if you agree, press OK. If not, press ESC key.";
+			
+			int r = IJX.WaitForUser(msg);
+			
+			bt.close();
+			
+			if (r == -1) return -1;
+			
+			//IJX.forceClose(imp2);
 		
-		String bbox = IJIF.runKCAMacroS("KCA_findEdge.ijm", arg);
-		
-		if (bbox == null || bbox.equals("") || bbox.equals("[aborted]"))
-			return -1;
-		
-		int r = IJIF.runKCAMacro("KCA_autoEdit.ijm", bbox);
-		
-		return r;
+		    */
+			
 	}
 	
 /*
