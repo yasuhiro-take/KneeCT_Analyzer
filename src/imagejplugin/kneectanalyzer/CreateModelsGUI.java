@@ -41,7 +41,7 @@ public class CreateModelsGUI {
 	private JLabel label_1L, label_2L, label_3L, label_4L;
 	
 	
-	private String[] btntitles = { "Binarize", "3D Viewer", "Alignment correction", "Auto edit" };
+	private String[] btntitles = { "Alignment correction", "Binarize", "Detect Anatomy", "Auto Edit" };
 	private static ImageIcon icons[];
 	
 	/**
@@ -170,7 +170,7 @@ public class CreateModelsGUI {
 		label_2L = new JLabel("");
 		frame.getContentPane().add(label_2L, "2, 10");
 		
-		btn_2 = new JButton("<html><center>"+btntitles[1] + "<br>for epicondyle selection</center></html>");
+		btn_2 = new JButton(btntitles[1]);
 		frame.getContentPane().add(btn_2, "4, 10, 5, 1");
 		btn_2.addActionListener(new btnActionListener());
 		
@@ -203,30 +203,18 @@ public class CreateModelsGUI {
 	
 	class frameWindowListener implements WindowListener {
 
-		@Override
-		public void windowActivated(WindowEvent arg0) {}
+		@Override public void windowActivated(WindowEvent arg0) {}
 
-		@Override
-		public void windowClosed(WindowEvent arg0) {
+		@Override public void windowClosed(WindowEvent arg0) {
 			// TODO Auto-generated method stub
 			opened = false;
 		}
 
-		@Override
-		public void windowClosing(WindowEvent arg0) {}
-
-		@Override
-		public void windowDeactivated(WindowEvent arg0) {}
-
-		@Override
-		public void windowDeiconified(WindowEvent arg0) {}
-
-		@Override
-		public void windowIconified(WindowEvent arg0) {}
-
-		@Override
-		public void windowOpened(WindowEvent arg0) {}
-		
+		@Override public void windowClosing(WindowEvent arg0) {}
+		@Override public void windowDeactivated(WindowEvent arg0) {}
+		@Override public void windowDeiconified(WindowEvent arg0) {}
+		@Override public void windowIconified(WindowEvent arg0) {}
+		@Override public void windowOpened(WindowEvent arg0) {}
 	}
 	
 	class btnActionListener implements ActionListener {
@@ -273,7 +261,10 @@ public class CreateModelsGUI {
 			switch(btn) {
 			case 'o':
 				r = IJIF.openKCADirectory();
-				r = (r >= 0) ? 0 : -1;
+				if (r == 0)
+					wintitle = IJIF.getOpenedTitle();
+				else 
+					r = (r > 0) ? 0 : -1;
 				
 				break;
 			case 's':
@@ -287,23 +278,16 @@ public class CreateModelsGUI {
 				r = 0;
 				break;
 			case 'c':
-				r = IJIF.closeWorkingFiles(wintitle, "Base", "TibOnly", "FemOnly");
+				r = IJIF.closeWorkingFiles(wintitle, "Aligned "+wintitle, "Base", "TibOnly", "FemOnly");
 				break;
 			case '1':
-				wintitle = IJIF.Modeler.binarize();
-				if (wintitle != null)
-					r = 0;
-				else
-					r = -1;
+				r = IJIF.Modeler.align();
 				break;
 			case '2':
-				if (IJIF.has3D())
-					r = IJIF3D.Modeler.determineFEC(wintitle);
-				
+				r = IJIF.Modeler.binarize(); 
 				break;
 			case '3':
-				r = IJIF.Modeler.align(wintitle);
-						
+				r = IJIF.Modeler.detectAnatomy();
 				break;
 			case '4':
 				r = IJIF.Modeler.autoEdit();
@@ -362,13 +346,16 @@ public class CreateModelsGUI {
 					break;
 				case '1':
 				case '2':
-				case '3':
 				case '4':
 					if (r == 0)
 						status = Character.getNumericValue(btn);
 					else
 						status = -1;
 
+					suggestion();
+					break;
+				case '3':
+					status = 3;
 					suggestion();
 					break;
 				
@@ -407,34 +394,32 @@ public class CreateModelsGUI {
 		case 0:
 			
 			if (IJIF.isStack()) {
-				if (wintitle == null)
-					wintitle = IJIF.getCurrentWindowTitle();
-				
 				if (IJIF.isBin()) {
 					String msg = "Current image is Binary stack, ";
 					
-					if (IJIF.isFEC()) {
-						msg += "with picondylar coordinates specified.\n";
-						msg += "If the image is not pre-aligned, proceed to *" + btntitles[2] + "*.\n";
-						msg += "If the image has already undergone *" + btntitles[2] + "*, " +
-								"You may want to proceed to *" + btntitles[3] + "*.\n";
+					if (IJIF.hasBoundaryData()) {
+						msg += "with anatomic boundary data.\n";
+						msg += "You may want to proceed to *" + btntitles[3] + "* ";
+						msg += "to create  FemOnly & TibOnly models.";
 						
 						messageBox.setText(msg);
-						label_3L.setIcon(arrowR);
 						label_4L.setIcon(arrowR);
 					} else {
-						msg += "but epicondylar coordinates are not defined.\n" +
-								"Proceed to *" + btntitles[1] +"* and determine epicondyles, or "+
-								"skip this process and proceed to *" + btntitles[2] + 
-								"* if 3D Viewer is not available on your system.";
+						msg += "but no anatomic boundary data.\n" +
+								"Proceed to *" + btntitles[2] +"*.";
 						
 						messageBox.setText(msg);
-						label_2L.setIcon(arrowR);
 						label_3L.setIcon(arrowR);
 					}
 				} else {
-					messageBox.setText("Current image is a non-binary stack. Please *Binarize* it.");
+					String msg = "Current image is a non-binary stack.\n";
+					msg += "If its alignment is not corrected, proceed to *";
+					msg += btntitles[0] + "*; otherwise, proceed to *";
+					msg += btntitles[1] + "*.";
+					
 					label_1L.setIcon(arrowR);
+					label_2L.setIcon(arrowR);
+					messageBox.setText(msg);
 				} 
 			} else {
 				messageBox.setText("Current image is not a stack, or no stack image is found.\n" + 
@@ -443,34 +428,40 @@ public class CreateModelsGUI {
 			}
 			break;
 		case 1: {
-			// after binarize 
-				String msg = "Now you may want to proceed to *"+btntitles[1]+
-						"* to determine the epicondyles. ";
-				msg += "If 3D Viewer is not available on your system, you can skip it and proceed to *" +
-						btntitles[2] + "*.\n";
-								
-				messageBox.setText(msg);
-				label_2L.setIcon(arrowR);
-				label_3L.setIcon(arrowR);
+			// after alignment correction
+			
+			String msg = "Alignment correection was successfully finished.";
+			msg += "Now you may want to proceed to *"+btntitles[1]+ "*."; 
+
+			messageBox.setText(msg);
+			label_2L.setIcon(arrowR);
 			break;
 		}
 		case 2: {
-			// after 3D viewer
-			// if points == 2
-			String msg = "Two points were determined. "+
-						"You can modify their placements by draging, or remove one "+
-						"in the point list window and add another.\n"+
-						"Then you may want to proceed to *"+btntitles[2] + "*.\n";
-			messageBox.setText(msg);
-			label_3L.setIcon(arrowR);
+			// after binarize;
+			if (IJIF.isBin()) {
+				String msg = "Image is successfully binarized. Now you may want to proceed to *";
+				msg += btntitles[2] + "*.";
+				messageBox.setText(msg);
+				label_3L.setIcon(arrowR);
+			}
 			break;		
 		}
 		case 3:
-			// after align.
-			messageBox.setText("Base model were created. You should save the Base model (*floppydisk icon*).\n" +
-					"Then you may want to proceed to *"+btntitles[3]+"*.");
-			label_save.setIcon(arrowD);
-			label_4L.setIcon(arrowR);
+			// after anatomy detection
+			if (IJIF.hasBoundaryData()) {
+				String msg = "The 'Base' model w/ Anatomic Boundary data ";
+				msg += "were created. You should save the Base model (*floppydisk icon*).\n";
+				msg += "Then proceed to *" + btntitles[3] + "*. ";
+				messageBox.setText(msg);
+				label_save.setIcon(arrowD);
+				label_4L.setIcon(arrowR);
+			} else {
+				String msg = "Anatomic Boundary Detection was failed; you should return to *";
+				msg += btntitles[1] +"* with a different threshold, and try re-do *" + btntitles[2] + "*.";
+				messageBox.setText(msg);
+				label_2L.setIcon(arrowR);
+			}
 			break;
 		case 4: // after auto-edit.
 			messageBox.setText("All models were created. You can save all the models and metadata (*floppydisk*).\n");
