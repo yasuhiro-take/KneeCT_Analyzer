@@ -420,69 +420,6 @@ class Quadrant  {
 		}
 	}
 	
-	private static void draw(ImageProcessor cip, Color c, XY qxy[]) {
-		cip.setLineWidth(1); cip.setColor(c);
-		
-		for (double i = 0; i <= 1; i+= 0.25) {
-			int x1 = (int)(qxy[0].x + (qxy[1].x - qxy[0].x) * i);
-			int y1 = (int)(qxy[0].y + (qxy[1].y - qxy[0].y) * i);
-			int x2 = (int)(x1 + qxy[2].x - qxy[0].x);
-			int y2 = (int)(y1 + qxy[2].y - qxy[0].y);
-			
-			//cip.drawLine(x1, y1, x2, y2);
-			Line l = new Line(x1, y1, x2, y2); l.drawPixels(cip);
-		}
-		
-		for (double i = 0; i <= 1; i+= 0.25) {
-			int x1 = (int)(qxy[0].x + (qxy[2].x - qxy[0].x) * i);
-			int y1 = (int)(qxy[0].y + (qxy[2].y - qxy[0].y) * i);
-			int x2 = (int)(x1 + qxy[1].x - qxy[0].x);
-			int y2 = (int)(y1 + qxy[1].y - qxy[0].y);
-			
-			//cip.drawLine(x1, y1, x2, y2);
-			Line l = new Line(x1, y1, x2, y2); l.drawPixels(cip);
-		}
-	}
-	
-	private static void drawFem(ImageProcessor ip, Color c, mPointList pl_px) {
-		XY qxy[] = new XY[3];
-		for (int i = 0; i < 3; i++) {
-			//qxy[i] = new XY();
-			//qxy[i].setFromPointYZ(pl_px.get(i));
-			qxy[i] = pl_px.get(i).getYZ();
-		}
-		
-		draw(ip, c, qxy);
-	}
-	
-	private static void drawFem(Overlay overlay, Color c, mPointList pl_px) {
-		XY qxy[] = new XY[3];
-		for (int i = 0; i < 3; i++)
-			qxy[i] = pl_px.get(i).getYZ();
-		
-		draw(overlay, qxy);
-		overlay.setStrokeColor(c);
-	}
-	
-	private static void drawTib(ImageProcessor ip, Color c, mPointList pl_px) {
-		XY qxy[] = new XY[3];
-		for (int i = 0; i < 3; i++) {
-			//qxy[i] = new XY();
-			//qxy[i].setFromPointXY(pl_px.get(i));
-			qxy[i] = pl_px.get(i).getXY();
-		}
-		
-		draw(ip, c, qxy);
-	}
-	private static void drawTib(Overlay ol, Color c, mPointList pl_px) {
-		XY qxy[] = new XY[3];
-		for (int i = 0; i < 3; i++)
-			qxy[i] = pl_px.get(i).getXY();
-		
-		draw(ol, qxy);
-		ol.setStrokeColor(c);
-	}
-	
 	private static Overlay createQuadrantOverlay(XY qxy_px[], String coordStr[]) {
 		Overlay ol = new Overlay();
 		draw(ol, qxy_px);
@@ -901,8 +838,8 @@ class Quadrant  {
 		
 	private static ImagePlus create2DImageTib(ImagePlus impTib) {
 		RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
-		int z1 = rtb.getProximalSlice(BoundaryData.TYPESTRING[BoundaryData.TIB]) - 1;
-		int z2 = rtb.getDistalSlice(BoundaryData.TYPESTRING[BoundaryData.TIB]) - 1;
+		int z1 = rtb.getProximalZ(BoundaryData.TYPESTRING[BoundaryData.TIB]);
+		int z2 = rtb.getDistalZ(BoundaryData.TYPESTRING[BoundaryData.TIB]);
 		ImagePlus impTibZ = IJX.zproject(impTib, z1, z2);
 		IJ.run(impTibZ, "RGB Color", "");
 		
@@ -971,8 +908,8 @@ class Quadrant  {
 		IJX.forceClose(impSag);
 		
 		RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
-		int z1 = rtb.getProximalSlice(BoundaryData.TYPESTRING[BoundaryData.TIB]) - 1;
-		int z2 = rtb.getDistalSlice(BoundaryData.TYPESTRING[BoundaryData.TIB]) - 1;
+		int z1 = rtb.getProximalZ(BoundaryData.TYPESTRING[BoundaryData.TIB]);
+		int z2 = rtb.getDistalZ(BoundaryData.TYPESTRING[BoundaryData.TIB]);
 		
 		tunnelRois[TIB] = getTunnels(imp, z1, z2); 
 		IJX.forceClose(imp);
