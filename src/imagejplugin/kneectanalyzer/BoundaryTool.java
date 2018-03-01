@@ -79,8 +79,12 @@ class BoundaryList {
 		bdlist.clear();
 	}
 	
-	public ArrayList<BoundaryData> get() {
-		return bdlist;
+	public void clear(int type) {
+		for (int i = bdlist.size() - 1; i >= 0; i--) {
+			BoundaryData bd = bdlist.get(i);
+			if (bd.type == type)
+				bdlist.remove(i);
+		}
 	}
 	
 	private BoundaryData find(int type, boolean proximal) {
@@ -115,7 +119,7 @@ class BoundaryList {
 		return null;
 	}
 	
-	public int findFirstSlice() {
+	public int findFirstZ() {
 		int z = Integer.MAX_VALUE;
 		for (BoundaryData bd: bdlist) {
 			z = Math.min(z, bd.z);
@@ -123,7 +127,7 @@ class BoundaryList {
 		return z;
 	}
 	
-	public int findLastSlice() {
+	public int findLastZ() {
 		int z = 0;
 		for (BoundaryData bd: bdlist) {
 			z = Math.max(z, bd.z);
@@ -143,27 +147,26 @@ class BoundaryList {
 				bd.px2real(cal);
 	}
 	
-	public void toResults(String title) {
+	public void toResults(String title, int nrx, boolean isPixelized) {
 		ResultsTable rt = IJX.getResultsTable(title);
 		if (rt != null)
 			rt.reset();
 		else
 			rt = new ResultsTable();
 		
-		int nrx = getMeanNotchRoofX();
 		rt.incrementCounter();
 		rt.addLabel("FemSplitX");
-		rt.addValue("PixelX", nrx);
+		rt.addValue(isPixelized ? "X" : "PixelX", nrx);
 		
 		BoundaryData bd;
-		int z1 = findFirstSlice(); int z2 = findLastSlice();
+		int z1 = findFirstZ(); int z2 = findLastZ();
 		for (int z = z1; z <= z2; z++) {
 			 for (int type: BoundaryData.TYPES) {
 				 if ((bd = find(type, z)) != null) {
 					 rt.incrementCounter();
 					 rt.addLabel(BoundaryData.TYPESTRING[type]);
 				
-					 if (type == BoundaryData.NOTCHROOF) {
+					 if (type == BoundaryData.NOTCHROOF && !isPixelized) {
 						 rt.addValue("PixelX", bd.x);
 						 rt.addValue("PixelY", bd.y);
 					 } else {
@@ -173,7 +176,7 @@ class BoundaryList {
 						 rt.addValue("Height", bd.h);
 					 } 
 				
-					 rt.addValue("Slice", z);
+					 rt.addValue(isPixelized ? "Z" : "Slice-1", z);
 				 }
 			 }
 		}
@@ -210,6 +213,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		super();
 		ImagePlus imp2 = imp.duplicate();
 		IJ.run(imp2, "Fill Holes", "stack");
+		IJ.run(imp2, "Open", "stack");
 		imp2.show();
 		
 		this.imp = imp2;
@@ -306,17 +310,56 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		return r;
 	}
 	
-	public void scanFemur(XYZ fec[]) {
+	public int scanFEC() {
+		int nSlices = imp.getNSlices();
+		double maxRectArea = 0;
+		int theSlice = 0;
+		Rect maxRect = null;
+		
+		for (int s = 0; s < nSlices; s++) {
+			int nResults = ap.newAnalyze(imp, s + 1);
+					
+			if (nResults > 0) {
+				double area[] = ap.getAllRowValues(6);
+				int row = IJX.Util.getMaxIndex(area);
+				Rect r = new Rect(ap.getMultiColumnValues(0, 3, row));
+				double rectarea = r.h * r.w;
+				if (rectarea > maxRectArea) {
+					maxRectArea = rectarea;
+					theSlice = s;
+					maxRect = r;
+				}
+				
+				if (nResults == 2 && maxRect != null) {
+					XY cxy1 = new XY (ap.getMultiColumnValues(4, 5, 0));
+					XY cxy2 = new XY (ap.getMultiColumnValues(4, 5, 1));
+					
+					if (maxRect.isInside(cxy1) && maxRect.isInside(cxy2) &&
+						Math.abs(cxy1.x - cxy2.x) > Math.abs(cxy1.y - cxy2.y) * 2) {
+						System.out.println("probable MFC/LFC slice:" + s);
+						
+						bdlist.add(new BoundaryData(BD_FEM, theSlice, maxRect));
+						
+						return 0;
+					}
+				}
+			}
+		}
+		
+		System.out.println("findFEC: theSlice=" + theSlice + " maxRect="+maxRect);
+		
+		return -1;
+	}
+	
+	public int scanFemur() {
 		final Calibration cal = imp.getCalibration();
-		double x0 = (fec[0].x + fec[1].x) / 2;
-		double y0 = (fec[0].y + fec[1].y) / 2;
-		int z0 = (int)((fec[0].z + fec[1].z) / 2 / cal.pixelDepth);
 		
 		ArrayList<RXYA> pdlist = new ArrayList<RXYA>();
 		
-		BoundaryData bdatF = null, bdatNotchEnd = null, bdatM = null, bdatL = null;
+		BoundaryData bdatNotchEnd = null, bdatM = null, bdatL = null;
+		BoundaryData bdatF = findProximal(BD_FEM);
 			
-		for (int z = z0; z < imp.getNSlices(); z++) {
+		for (int z = bdatF.z + 1; z < imp.getNSlices(); z++) {
 			ImageProcessor ip = imp.getImageStack().getProcessor(z + 1);
 			
 			int nResults = ap.newAnalyze(imp, ip);
@@ -327,63 +370,53 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 				for (int i = 0; i < nResults; i++) 
 					pdlist.add(new RXYA(ap.getAllColumnValues(i)));
 			
-				if (bdatF == null) { // mostly when z == z0;
-					double len[] = new double[nResults];
-					for (int i = 0; i < nResults; i++)
-						len[i] = Math.abs(pdlist.get(i).cx - x0) + Math.abs(pdlist.get(i).cy - y0);
-									
-					int i_min = IJX.Util.getMinIndex(len);
-					bdatF = new BoundaryData(BD_FEM, z, pdlist.get(i_min).r);
-					bdlist.add(bdatF);
-				} else { // bboxFem is already determined; always z > z0;
-					for(int i = pdlist.size() - 1; i >= 0; i--)
-						if (!bdatF.isInside(pdlist.get(i).cx, pdlist.get(i).cy))
-							pdlist.remove(i);
-					
-					if (pdlist.size() > 0) { // particles inside the bdatF(=boundarybox of femur at epicondylar level)
-						if (bdatNotchEnd == null && pdlist.size() == 2) {
-							// when the slice# for distal-end of notch is not determined,
-							RXYA pd1 = pdlist.get(0), pd2 = pdlist.get(1); 
-							if (Math.abs(pd1.cx - pd2.cx) > Math.abs(pd1.cy - pd2.cy) &&
-								Math.abs(pd1.area - pd2.area) / (pd1.area + pd2.area) < 0.25) {
-								// when two particles locate medio-laterally, not antero-posteriorly
-								// the sizes of two particles are similar 
-								bdatNotchEnd = new BoundaryData(BD_NOTCHEND, z - 1,
-									Math.min(pd1.cx, pd2.cx), Math.min(pd1.r.y, pd2.r.y), 
-									Math.abs(pd1.cx - pd2.cx), Math.max(pd1.r.h, pd2.r.h));
-								bdlist.add(bdatNotchEnd);
-								
-								if (pd1.cx < pd2.cx) {
-									rectM = pd1.r; rectL = pd2.r;
-								} else {
-									rectM = pd2.r; rectL = pd1.r;
-								}
+				for(int i = pdlist.size() - 1; i >= 0; i--)
+					if (!bdatF.isInside(pdlist.get(i).cx, pdlist.get(i).cy))
+						pdlist.remove(i);
+				
+				if (pdlist.size() > 0) { // particles inside the bdatF(=boundarybox of femur at epicondylar level)
+					if (bdatNotchEnd == null && pdlist.size() == 2) {
+						// when the slice# for distal-end of notch is not determined,
+						RXYA pd1 = pdlist.get(0), pd2 = pdlist.get(1); 
+						if (Math.abs(pd1.cx - pd2.cx) > Math.abs(pd1.cy - pd2.cy) &&
+							Math.abs(pd1.area - pd2.area) / (pd1.area + pd2.area) < 0.4) {
+							// when two particles locate medio-laterally, not antero-posteriorly
+							// the sizes of two particles are similar 
+							bdatNotchEnd = new BoundaryData(BD_NOTCHEND, z - 1,
+								Math.min(pd1.cx, pd2.cx), Math.min(pd1.r.y, pd2.r.y), 
+								Math.abs(pd1.cx - pd2.cx), Math.max(pd1.r.h, pd2.r.h));
+							bdlist.add(bdatNotchEnd);
+							
+							if (pd1.cx < pd2.cx) {
+								rectM = pd1.r; rectL = pd2.r;
+							} else {
+								rectM = pd2.r; rectL = pd1.r;
 							}
-						} else if (bdatM != null || bdatL != null) {
-							// when medial or lateral condyle is separately identified in the previous slice	
-							for (RXYA pd: pdlist) {
-								if (bdatM != null && bdatM.isInside(pd.cx, pd.cy))
-									rectM = pd.r;
-								if (bdatL != null && bdatL.isInside(pd.cx, pd.cy))
-									rectL = pd.r;
-							}
+						}
+					} else if (bdatM != null || bdatL != null) {
+						// when medial or lateral condyle is separately identified in the previous slice	
+						for (RXYA pd: pdlist) {
+							if (bdatM != null && bdatM.isInside(pd.cx, pd.cy))
+								rectM = pd.r;
+							if (bdatL != null && bdatL.isInside(pd.cx, pd.cy))
+								rectL = pd.r;
+						}
 
-							if (rectM == null || rectL == null) {
-								// when condyle is depicted smaller (than the thresholded size),
-								// the tibial spine may be identified as particle
-								for (RXYA pd: pdlist) 
-									if (bdatNotchEnd.isInside(pd.cx, pd.cy) && pd.r != rectM && pd.r != rectL) 
-										rectT = pd.r;
-								
-								// reduce the bounding box determined in the previous slice
-								if (rectM == null && bdatM != null) 
-									rectM = reduceBoundaryBox2((ByteProcessor)ip, cal, bdatM);
-								if (rectL == null && bdatL != null)
-									rectL = reduceBoundaryBox2((ByteProcessor)ip, cal, bdatL);
-							} // if rectM/rectL == null
-						} // elseif bdatM/bdatL != null
-					} // if rows.size > 0
-				} // if bdatF == null
+						if (rectM == null || rectL == null) {
+							// when condyle is depicted smaller (than the thresholded size),
+							// the tibial spine may be identified as particle
+							for (RXYA pd: pdlist) 
+								if (bdatNotchEnd.isInside(pd.cx, pd.cy) && pd.r != rectM && pd.r != rectL) 
+									rectT = pd.r;
+							
+							// reduce the bounding box determined in the previous slice
+							if (rectM == null && bdatM != null) 
+								rectM = reduceBoundaryBox2((ByteProcessor)ip, cal, bdatM);
+							if (rectL == null && bdatL != null)
+								rectL = reduceBoundaryBox2((ByteProcessor)ip, cal, bdatL);
+						} // if rectM/rectL == null
+					} // elseif bdatM/bdatL != null
+				} // if rows.size > 0
 			} // if nResults > 0
 			
 			if (pdlist.size() == 0 && bdatM != null)
@@ -404,6 +437,10 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 			
 			ap.rt.reset();
 		} // end for(z) loop
+		
+		if (bdatNotchEnd == null || findDistal(BD_MFC) == null || findDistal(BD_LFC) == null || findDistal(BD_TIB) == null)
+			return -1;
+		return 0;
 	}
 	
 	public void scanProxTibia() {
