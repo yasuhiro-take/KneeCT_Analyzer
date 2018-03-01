@@ -44,26 +44,21 @@ public class FTDivider implements PlugIn {
 			ip.setColor(0);
 			
 			BoundaryData bd = rtb.get(BoundaryData.MFC, z);
-			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				ip.fillRect((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-			}
+			if (bd != null)
+				ip.fillRect((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
+			
 			
 			bd = rtb.get(BoundaryData.LFC, z);
-			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				ip.fillRect((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
-			}
+			if (bd != null)
+				ip.fillRect((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
 			
 			bd = rtb.get(BoundaryData.TIB, z);
 			if (bd != null) {
-				Rect r = ((Rect)bd).clonePixelized(cal);
-				
 				imp.setSliceWithoutUpdate(z + 1);
-				imp.setRoi((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
+				imp.setRoi((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
 				imp.copy();
 				imp.killRoi();
-				impTib.setRoi((int)r.x,  (int)r.y,  (int)r.w,  (int)r.h);
+				impTib.setRoi((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
 				impTib.paste();
 				impTib.killRoi();
 			}
