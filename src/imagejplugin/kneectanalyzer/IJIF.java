@@ -19,6 +19,7 @@ import ij.plugin.filter.ParticleAnalyzer;
 import ij.plugin.filter.PlugInFilterRunner;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
+import ij.process.ImageStatistics;
 import ij.text.TextWindow;
 
 import java.awt.AWTEvent;
@@ -40,6 +41,7 @@ public class IJIF implements Measurements {
 	//private static double TPangle;
 	
 	private static boolean initializedFlag;
+	private static String nonKCAtitle;
 	
 	private static final String FILENAME_FEC = "fec.points";
 	private static final String FILENAME_BOUNDARY = "boundary.txt";
@@ -190,13 +192,21 @@ public class IJIF implements Measurements {
 	}
 	
 	private static Calibration parseMetadata(String filedata, Calibration cal, boolean toResults) {
-		String voxel = null;
+		
 		//String lines[] = filedata.split(System.getProperty("line.separator"));
 		String lines[] = filedata.split("\n");
 		
 		for (int i = 0; i < lines.length; i++) {
-			if (i == 0) {
-				voxel = lines[0];
+			if (i == 0) {		
+				String voxeldata[] = lines[0].split(" ");
+				
+				String unit = voxeldata[3].replaceAll("[\r\n]", "");
+							
+				cal.setUnit(unit);
+				cal.pixelWidth = Double.parseDouble(voxeldata[0]);
+				cal.pixelHeight = Double.parseDouble(voxeldata[1]);
+				cal.pixelDepth = Double.parseDouble(voxeldata[2]);
+				
 				lines[0] = null;
 			} else {
 				if (lines[i].matches("^[a-zA-Z].*")) {
@@ -208,23 +218,15 @@ public class IJIF implements Measurements {
 				} else {
 					if (toResults) {
 						BoundaryList bl = new BoundaryList(lines);
-						bl.toResults(WINTITLE_BOUNDARY);
+						int nrx = bl.getMeanNotchRoofX();
+						bl.clear(BoundaryData.NOTCHROOF);
+						bl.real2px(cal);
+						bl.toResults(WINTITLE_BOUNDARY, nrx, true);
 					}	
 					
 					i = lines.length;
 				}
 			}
-		}
-		
-		if (voxel != null) {
-			String voxeldata[] = voxel.split(" ");
-			
-			String unit = voxeldata[3].replaceAll("[\r\n]", "");
-						
-			cal.setUnit(unit);
-			cal.pixelWidth = Double.parseDouble(voxeldata[0]);
-			cal.pixelHeight = Double.parseDouble(voxeldata[1]);
-			cal.pixelDepth = Double.parseDouble(voxeldata[2]);
 		}
 		
 		return cal;
@@ -352,7 +354,7 @@ public class IJIF implements Measurements {
 		if (bd == null)
 			bd = rtb.getDistal(BD_TYPE[BoundaryData.TIB]);
 			
-		XY fibYZ = new XY((bd.y + bd.h) / cal.pixelWidth, bd.z);
+		XY fibYZ = new XY(bd.y + bd.h, bd.z);
 		XY center = new XY(w / 2, h / 2);
 		XY fibYZr = IJX.Util.rotateXY(fibYZ, center, srf.angle);
 		int z = (int)fibYZr.y;
@@ -380,8 +382,9 @@ public class IJIF implements Measurements {
 	
 	
 	public static int openKCADirectory(String... models) {
+		nonKCAtitle = null;
 		String dir = openDirectoryDialog("Select directory");
-				
+		
 		if (dir == null)
 			return -1;
 		
@@ -417,8 +420,15 @@ public class IJIF implements Measurements {
 			Calibration cal = parseMetadata(filedata, imp.getCalibration(), rtboundary == false);
 			imp.setCalibration(cal);
 			
-			IJIF.fec = null;
-			IJIF.fec = IJX.loadPointList(dir, IJIF.FILENAME_FEC);
+			if (rtboundary) {
+				RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
+				if (rtb.isReal()) {
+					System.out.println("old version of resultstable boundary data is converted.");
+					rtb.real2px(cal);
+				}
+			}
+			
+			//IJIF.fec = IJX.loadPointList(dir, IJIF.FILENAME_FEC);
 			
 			Quadrant.init();
 			Quadrant.load(dir);
@@ -436,9 +446,20 @@ public class IJIF implements Measurements {
 			
 			return ret;
 		} else {
-			IJ.run("Image Sequence...", "open="+dir);				
-			return 0;
+			IJ.run("Image Sequence...", "open="+dir);
+			IJ.wait(50);
+			ImagePlus imp = WindowManager.getCurrentImage();
+			if (imp != null) {
+				imp.show();
+				nonKCAtitle = imp.getTitle();
+				return 0;
+			} else
+				return -1;
 		}
+	}
+	
+	public static String getOpenedTitle() {
+		return nonKCAtitle;
 	}
 	
 	public static int closeWorkingFiles(String... wintitles) {
@@ -563,20 +584,26 @@ public class IJIF implements Measurements {
 			return save(wins);
 		}
 		
-		public static String binarize() {
-			ImagePlus imp = WindowManager.getCurrentImage();
+		public static int binarize() {
+			ImagePlus imp;
+			if ((imp = WindowManager.getCurrentImage()) == null)
+				return -1;
+			
+			imp = imp.duplicate();
+			imp.show();
 			imp.killRoi();
 			
-			IJ.run(imp, "Threshold...", "");
-			IJ.setThreshold(imp, 150, 1500);
+			WindowManager.setCurrentWindow(imp.getWindow());
 			
-			int r = IJX.WaitForUser("Image is thresholded for bone density.\n"+
-				"Please review and adjust the threshold if necessary;\nthen press OK of this dialog.");
-			if (r == -1) return null;
+			Thresholder threr = new Thresholder ("Bone Thresholding", "Image is thresholded for bone density.\n"+
+					"Please review and adjust the threshold if necessary;\nthen press OK of this dialog.");	
+			new PlugInFilterRunner(threr, null, null);
 			
-			Calibration cal = imp.getCalibration();
-			minThreshold = cal.getCValue(imp.getProcessor().getMinThreshold());
-			maxThreshold = cal.getCValue(imp.getProcessor().getMaxThreshold());
+			if (!threr.wasOK) return -1;
+			
+			IJ.setThreshold(imp, threr.min, threr.max);
+			minThreshold = threr.min;
+			maxThreshold = threr.max;
 			
 			IJ.run(imp, "Make Binary", "method=Default background=Default");
 			
@@ -600,50 +627,38 @@ public class IJIF implements Measurements {
 			}
 			//IJ.run(imp, "Fill Holes", "stack");
 			
-			return imp.getTitle();
+			return 0;
 		}
 		
-		public static int align(String wintitle) {
-			if (ij3d) {
-				IJIF3D.Modeler.updateFEC(wintitle);
-			}
+		public static int align() {
+			ImagePlus imp = WindowManager.getCurrentImage();
+			if (imp == null) 
+				return -1;
 			
 			OrthogonalTransformer ot = new OrthogonalTransformer();
-			int r = ot.run(wintitle, IJIF.fec);
-			
-			if (r == 0) {
-				ImagePlus imp = ot.getTransformedImage();
-				IJ.setThreshold(imp, 64, 255, null); // TODO: threshold by user-defined ??
-				IJ.run(imp, "Make Binary", "method=Default background=Default");
-				//IJ.run(imp, "Fill Holes", "stack");
-				IJX.rename(imp, "Base");
-				
-				mPointList pl = ot.getTransformedPointList(); 
-				if (pl != null && pl.size() >= 2) {
-					fec = pl;
-					
-					if (ij3d)
-						IJIF3D.Modeler.showModelAndPoints(imp, pl);
-				} else {
-					r = determineFemEpiCondylesBy2D(imp);
-				}
-			}
+			int r = ot.directRun(imp, null);
 			
 			return r;
 		}
 		
-		public static int autoEdit() {
-			ImagePlus imp = WindowManager.getImage("Base");
-			if (fec == null) {
-				int r = determineFemEpiCondylesBy2D(imp);
-				if (r == -1) return -1;
-			}
+		public static int detectAnatomy() {
+			ImagePlus imp = WindowManager.getCurrentImage();
+			if (imp == null) return -1;
 			
 			AnatomyDetector ad = new AnatomyDetector();
-			int r = ad.directRun(imp, fec.toArray());
+			int r = ad.directRun(imp);
 			
 			if (r == -1) return -1;
 			
+			IJX.rename(imp, "Base");
+			
+			return 0;
+		}
+
+		public static int autoEdit() {
+			ImagePlus imp = WindowManager.getImage("Base");
+			if (imp == null) return -1;
+		
 			notice(null);
 			notice("Creating isolated bone models...\nThis may take some time...");
 			
