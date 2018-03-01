@@ -48,9 +48,7 @@ public class AnatomyDetector implements PlugIn, ImageListener {
 	private BoundaryTool bt;
 	private int flag, lastSlice, nrx;
 	private RoiManager rm;
-	private AnatomyDetectorDialog add;
 	
-
 	@Override public void run(String arg) {
 	}
 	
@@ -81,7 +79,7 @@ public class AnatomyDetector implements PlugIn, ImageListener {
 		msg += "Edit the boundary ROI if necessary.\n";
 		msg += "When finished, click OK of this dialog.";
 		
-		add = new AnatomyDetectorDialog(msg, imp, rm, bt);
+		AnatomyDetectorDialog add = new AnatomyDetectorDialog(msg, imp, rm, bt);
 		new PlugInFilterRunner(add, null, null);
 		
 		updateData(imp.getSlice());
