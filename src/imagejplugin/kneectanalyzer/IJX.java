@@ -20,13 +20,13 @@ import ij.process.ShortProcessor;
 import ij.text.TextWindow;
 
 class IJX {
-	public static ImagePlus zproject(ImagePlus stack, int start, int end) {
+	public static ImagePlus zproject(ImagePlus stack, int method, int start, int end) {
 		Calibration calS = stack.getCalibration();
 		
 		ZProjector zp = new ZProjector(stack);
 		zp.setStartSlice(start);
 		zp.setStopSlice(end);
-		zp.setMethod(ZProjector.AVG_METHOD);
+		zp.setMethod(method);
 		zp.doProjection();
 		ImagePlus impZ = zp.getProjection();
 		
@@ -40,7 +40,15 @@ class IJX {
 	}
 	
 	public static ImagePlus zproject(ImagePlus stack) {
-		return zproject(stack, 1, stack.getStackSize());
+		return zproject(stack, ZProjector.AVG_METHOD, 1, stack.getStackSize());
+	}
+	
+	public static ImagePlus zproject(ImagePlus stack, int start, int end) {
+		return zproject(stack, ZProjector.AVG_METHOD, start, end);
+	}
+	
+	public static ImagePlus zproject(ImagePlus stack, int method) {
+		return zproject(stack, method, 1, stack.getStackSize());
 	}
 	
 	public static ImagePlus reslice(ImagePlus imp, double output, String start) {
@@ -103,7 +111,7 @@ class IJX {
 		return r;	
 	}
 	
-	public int error(String msg) {
+	public static int error(String msg) {
 		return error(msg, -1);
 	}
 	
@@ -199,6 +207,7 @@ class IJX {
 		int width[] = new int[imps.length];
 		int height[] = new int[imps.length];
 		int imageType = 0;
+		double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
 			
 		for (int i = 0; i < imps.length; i++) {
 			if (imps[i] != null) {
@@ -213,6 +222,8 @@ class IJX {
 				maxheight = (maxheight > h) ? maxheight : h;
 				
 				imageType = Math.max(imps[i].getType(), imageType);
+				min = Math.min(min, imps[i].getProcessor().getMin());
+				max = Math.max(max, imps[i].getProcessor().getMax());
 			}
 		}
 		
@@ -236,12 +247,15 @@ class IJX {
 				imps[i].killRoi();
 				imps[i].getProcessor().snapshot();
 				imps[i].copy();
+				IJ.wait(50);
 			
 				impC.setRoi(px[i], 0, width[i], height[i]);
 				impC.paste();
 				impC.killRoi();
 			}
 		}
+		
+		ip.setMinAndMax(min, max);
 		
 		return impC;
 	}
