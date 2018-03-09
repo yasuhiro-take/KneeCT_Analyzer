@@ -340,40 +340,6 @@ class IJX {
 		return impLFC;
 	}
 	
-	public static void convertTunOnly(ImagePlus imp, QRoiList ql) {
-		IJ.setForegroundColor(128, 128, 128);
-		for (QRoi qroi: ql.qroiList) {
-			imp.setSliceWithoutUpdate(qroi.z + 1);
-			imp.getProcessor().fill(qroi.roi);
-		}
-		
-		imp.updateAndDraw();
-		
-		IJ.setThreshold(imp, 127, 128);
-		IJ.run(imp, "Make Binary", "method=Default background=Default");
-	}
-	
-	public static ImagePlus createTunOnlyFem(ImagePlus impLFC, QRoiList ql) {
-		ImagePlus impSag = IJX.createAx2Sag(impLFC);
-		//IJX.convertTunOnly(impSag, Quadrant.tunnelRoisFem);
-		IJX.convertTunOnly(impSag, ql);
-		ImagePlus impTun = IJX.createSag2Ax(impSag);
-		IJX.rename(impTun, "TunOnlyFem");
-		
-		IJX.forceClose(impSag);
-		
-		return impTun;
-	}
-	
-	public static ImagePlus createTunOnlyTib(ImagePlus impTib, QRoiList ql) {
-		ImagePlus impTun = impTib.duplicate();
-		impTun.show();
-		IJX.convertTunOnly(impTun, ql);
-		IJX.rename(impTun, "TunOnlyTib");
-		
-		return impTun;
-	}
-	
 	public static ImagePlus createAx2Sag(ImagePlus imp) {
 		imp.show();
 		Calibration cal = imp.getCalibration();
