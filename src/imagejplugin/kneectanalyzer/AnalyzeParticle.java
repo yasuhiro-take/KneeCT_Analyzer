@@ -17,7 +17,7 @@ class AnalyzeParticle implements Measurements {
 	static final int defaultOption = ParticleAnalyzer.EXCLUDE_EDGE_PARTICLES | ParticleAnalyzer.INCLUDE_HOLES;
 	static final int defaultMeasurements =  AREA | CENTROID | RECT | SLICE | STACK_POSITION;
 	
-	private void commonInit(int option, int measurements, double minSize, double maxSize, Calibration cal, String rtLabel) {
+	private void commonInit(int option, int measurements, double minSize, double maxSize, double minC, double maxC, Calibration cal, String rtLabel) {
 		double minSizePx = minSize / (cal.pixelWidth * cal.pixelHeight);
 		double maxSizePx = maxSize / (cal.pixelWidth * cal.pixelHeight);
 		
@@ -29,7 +29,7 @@ class AnalyzeParticle implements Measurements {
 			rois = null;
 		
 		rt = new ResultsTable();
-		analyzer = new ParticleAnalyzer(option, measurements, rt, minSizePx, maxSizePx, 0, 1);
+		analyzer = new ParticleAnalyzer(option, measurements, rt, minSizePx, maxSizePx, minC, maxC);
 		rtIndex = null;
 		this.rtLabel = rtLabel;
 	}
@@ -39,7 +39,7 @@ class AnalyzeParticle implements Measurements {
 		int m = defaultMeasurements | measurements;
 		double maxSize = Double.POSITIVE_INFINITY;
 		
-		commonInit(o, m, minSize, maxSize, cal, rtLabel);
+		commonInit(o, m, minSize, maxSize, 0, 1, cal, rtLabel);
 	}
 	
 	public AnalyzeParticle(int option, int measurements, double minSize, Calibration cal, String rtLabel) {
@@ -47,13 +47,19 @@ class AnalyzeParticle implements Measurements {
 		
 		double maxSize = Double.POSITIVE_INFINITY;
 		
-		commonInit(option, m, minSize, maxSize, cal, rtLabel);
+		commonInit(option, m, minSize, maxSize, 0, 1, cal, rtLabel);
 	}
 	
 	public AnalyzeParticle(int option, int measurements, double minSize, double maxSize, Calibration cal, String rtLabel) {
 		int m = defaultMeasurements | measurements;
 		
-		commonInit(option, m, minSize, maxSize, cal, rtLabel);
+		commonInit(option, m, minSize, maxSize, 0, 1, cal, rtLabel);
+	}
+	
+	public AnalyzeParticle(int option, int measurements, double minSize, double maxSize, double minC, double maxC, Calibration cal, String rtLabel) {
+		int m = defaultMeasurements | measurements;
+		
+		commonInit(option, m, minSize, maxSize, minC, maxC, cal, rtLabel);
 	}
 	
 	public AnalyzeParticle(double minSize, Calibration cal, String rtLabel) {
@@ -61,14 +67,14 @@ class AnalyzeParticle implements Measurements {
 		int m = defaultMeasurements;
 		double maxSize = Double.POSITIVE_INFINITY;
 		
-		commonInit(o, m, minSize, maxSize, cal, rtLabel);
+		commonInit(o, m, minSize, maxSize, 0, 1, cal, rtLabel);
 	}
 	
 	public AnalyzeParticle(double minSize, double maxSize, Calibration cal, String rtLabel) {
 		int o = defaultOption;
 		int m = defaultMeasurements;
 		
-		commonInit(o, m, minSize, maxSize, cal, rtLabel);
+		commonInit(o, m, minSize, maxSize, 0, 1, cal, rtLabel);
 	}
 	
 	public void analyze(ImagePlus imp, ImageProcessor ip) {
