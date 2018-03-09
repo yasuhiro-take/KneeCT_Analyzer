@@ -13,24 +13,22 @@ public class FTDivider implements PlugIn {
 	}
 	
 	public int directRun(ImagePlus imp) {
-		RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
-		
-		ImagePlus impTib = createTibOnly(imp, rtb); impTib.show();
+		ImagePlus impTib = createTibOnly(imp); impTib.show();
 		ImagePlus impFem = createFemOnly(imp, impTib); impFem.show();  
 		
 		return 0;
 	}
 	
 	
-	private static ImagePlus createTibOnly(ImagePlus imp, RTBoundary rtb) {
+	private static ImagePlus createTibOnly(ImagePlus imp) {
 		ImagePlus impTib = imp.duplicate();
 		IJX.rename(impTib, "TibOnly");
 		Calibration cal = impTib.getCalibration();
 		int W0 = imp.getWidth(), H0 = imp.getHeight();
 		
-		int zM = rtb.getDistal(BoundaryData.MFC).z;
-		int zL = rtb.getDistal(BoundaryData.LFC).z;
-		int zT = rtb.getProximal(BoundaryData.TIB).z;
+		int zM = RTBoundary.getDistal(BoundaryData.MFC).z;
+		int zL = RTBoundary.getDistal(BoundaryData.LFC).z;
+		int zT = RTBoundary.getProximal(BoundaryData.TIB).z;
 		
 		for (int z = 0; z < zT; z++) {
 			ByteProcessor ip = (ByteProcessor)impTib.getImageStack().getProcessor(z + 1);
@@ -43,16 +41,16 @@ public class FTDivider implements PlugIn {
 			ByteProcessor ip = (ByteProcessor)impTib.getProcessor();
 			ip.setColor(0);
 			
-			BoundaryData bd = rtb.get(BoundaryData.MFC, z);
+			BoundaryData bd = RTBoundary.get(BoundaryData.MFC, z);
 			if (bd != null)
 				ip.fillRect((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
 			
 			
-			bd = rtb.get(BoundaryData.LFC, z);
+			bd = RTBoundary.get(BoundaryData.LFC, z);
 			if (bd != null)
 				ip.fillRect((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);
 			
-			bd = rtb.get(BoundaryData.TIB, z);
+			bd = RTBoundary.get(BoundaryData.TIB, z);
 			if (bd != null) {
 				imp.setSliceWithoutUpdate(z + 1);
 				imp.setRoi((int)bd.x,  (int)bd.y,  (int)bd.w,  (int)bd.h);

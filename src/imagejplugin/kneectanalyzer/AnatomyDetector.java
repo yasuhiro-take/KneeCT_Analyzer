@@ -43,7 +43,7 @@ import ij.process.ImageProcessor;
 
 
 public class AnatomyDetector implements PlugIn, ImageListener {
-	public static final String WINTITLE_BOUNDARY = "Anatomic Boundary";
+	public static final String WINTITLE_BOUNDARY = RTBoundary.WINTITLE_BOUNDARY;
 	private ImagePlus imp;
 	private BoundaryTool bt;
 	private int flag, lastSlice, nrx;
