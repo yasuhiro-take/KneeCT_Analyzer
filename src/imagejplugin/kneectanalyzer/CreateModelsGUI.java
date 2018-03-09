@@ -194,9 +194,6 @@ public class CreateModelsGUI {
 		messageBox = new JTextPane();
 		messageBox.setEditable(false);
 		frame.getContentPane().add(messageBox, "2, 18, 9, 1, fill, fill");
-	
-		if (!IJIF.has3D())
-			btn_2.setEnabled(false);
 		
 		frame.addWindowListener(new frameWindowListener());
 	}

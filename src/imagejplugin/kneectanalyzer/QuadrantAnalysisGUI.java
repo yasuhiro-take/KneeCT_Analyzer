@@ -43,7 +43,7 @@ public class QuadrantAnalysisGUI {
 	private JLabel label_1L, label_2L, label_3L, label_4L;
 	private JToggleButton tbtn1, tbtn2;
 	
-	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results" };
+	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "" };
 	private String[] btntitles3D = { "3D Viewer", "Manual-set Quadrant System", "Refresh Results", "Snapshot" };
 	private static ImageIcon icons[];
 	private static String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
@@ -202,6 +202,8 @@ public class QuadrantAnalysisGUI {
 		btn_4 = new JButton(btntitles[3]);
 		frame.getContentPane().add(btn_4, "4, 16, 5, 1");
 		btn_4.addActionListener(new btnActionListener());
+		if (mode2D3D == 1)
+			btn_4.setEnabled(false);
 		
 		JSeparator separator_1 = new JSeparator();
 		frame.getContentPane().add(separator_1, "2, 18, 9, 1");
@@ -292,18 +294,24 @@ public class QuadrantAnalysisGUI {
 			break;
 		} 
 		case 3: {
-			String msg = "Detected tunnel data are listed in Results window, and 2D images (";
-			msg += Quadrant.WINTITLE_FEM2D + " & " + Quadrant.WINTITLE_TIB2D + ").\n";
-			msg += "Review those images, and remove non-tunnel data from Results (by right-click & choose clear).\n";
-			msg += "You can add a small ROI on an auto-detected region through a selection tool and ";
-			msg += "IJ's *Measure* command.\n";
-			msg += "After clear & adding, proceed to *"+btntitles[3]+"*.";
+			String msg = "Detected tunnel data are listed in Results window, with 2D and 3D images.\n";
+			msg += "You can save these data in KCA folder ";
+			msg += "(*floppy icon*).\n";
+			int tuns = Quadrant.tunnelDetermined();
+			if (tuns < 3) {
+				int missft = 3 - tuns;
+				msg += "You can repeat *" + btntitles[2] +"* to detect " + quadStatus[missft] + " tunnels.";
+				label_3L.setIcon(arrowR);
+			}
+				
+			
 			messageBox.setText(msg);
-			label_4L.setIcon(arrowR);
+			label_save.setIcon(arrowD);
 			break;
 			
 		}
 		case 4: {
+			/*
 			String msg = "Results & internal data are refreshed.\n";
 			msg += "You can repeat *"+btntitles[2]+"* and *"+btntitles[3]+"*.\n";
 			msg += "Copy the QuadX & Y data in Results to a spreadsheet software, or just save them through IJ.\n";
@@ -313,11 +321,12 @@ public class QuadrantAnalysisGUI {
 			label_3L.setIcon(arrowR);
 			label_4L.setIcon(arrowR);
 			label_save.setIcon(arrowD);
+			*/
 			break;
 		}
 			
 		case 5: {
-			String msg = "Data stored in KCA folder. Close the image windows and initialize internal data (*X icon*).";
+			String msg = "Data stored in KCA folder. Close the image & results windows (*X icon*).";
 			messageBox.setText(msg);
 			label_close.setIcon(arrowD);
 			break;
@@ -418,6 +427,7 @@ public class QuadrantAnalysisGUI {
 				btn_2.setText(btntitles[1]);
 				btn_3.setText(btntitles[2]);
 				btn_4.setText(btntitles[3]);
+				btn_4.setEnabled(false);
 				tbtn1.setSelected(true);
 				tbtn2.setSelected(false);
 				status = (status >= 3) ? 3 : 0;
@@ -427,6 +437,7 @@ public class QuadrantAnalysisGUI {
 				btn_2.setText(btntitles3D[1]);
 				btn_3.setText(btntitles3D[2]);
 				btn_4.setText(btntitles3D[3]);
+				btn_4.setEnabled(true);
 				tbtn1.setSelected(false);
 				tbtn2.setSelected(true);
 				status = (status >= 3) ? 3 : 0;
@@ -498,7 +509,7 @@ public class QuadrantAnalysisGUI {
 				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
 				break;
 			case '4':
-				r = (mode2D3D == 1) ? IJIF.Quad.refreshResults2D() : IJIF3D.Quad.snapshot();
+				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() : IJIF3D.Quad.snapshot();
 				break;
 			} 
 			
@@ -540,7 +551,7 @@ public class QuadrantAnalysisGUI {
 					
 					break;
 				case 's':
-					if (status == 4)
+					if (status == 3 && mode2D3D == 1)
 						status = 5;
 					
 					suggestion();
