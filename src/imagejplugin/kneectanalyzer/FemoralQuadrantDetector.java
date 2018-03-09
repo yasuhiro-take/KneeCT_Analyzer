@@ -1,21 +1,108 @@
 package imagejplugin.kneectanalyzer;
 
+import java.awt.Color;
+import java.util.ArrayList;
+
+import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Line;
+import ij.measure.Calibration;
 import ij.measure.CurveFitter;
 import ij.plugin.PlugIn;
+import ij.plugin.filter.ParticleAnalyzer;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
+import imagejplugin.kneectanalyzer.Quadrant.SysCoord;
 
 
 
 public class FemoralQuadrantDetector implements PlugIn {
-	@Override
-	public void run(String arg) {
-		// TODO Auto-generated method stub
-		
+	private static Color notchRoofColor = new Color(0,0,255);
+	
+	public FemoralQuadrantDetector() {
 	}
 	
+	@Override public void run(String arg) {		// TODO Auto-generated method stub
+	}
 	
+	public ImagePlus directRun() {
+		int nrx = RTBoundary.getSplitX();
+		
+		ImagePlus impSagZ = IJX.createLFCSagittalProjection(nrx);
+		
+		QCurveFitter cf = analyzeBlumensaat(impSagZ);
+		
+		AnalyzeParticle ap = new AnalyzeParticle(ParticleAnalyzer.INCLUDE_HOLES | ParticleAnalyzer.SHOW_MASKS, 
+				0, 500, impSagZ.getCalibration(), null);
+		ap.analyze(impSagZ, impSagZ.getProcessor(), 16, 255);
+		ImagePlus impSagM = ap.analyzer.getOutputImage();
+		
+		XY refxy[] = getRefCoordsFem(impSagM, cf);
+		XY qxyPx[] = getSystemCoordFem(refxy);
+		correctHL100(impSagM, qxyPx);
+		SysCoord.output(Quadrant.FEM, qxyPx, impSagZ.getCalibration());
+		
+		Quadrant.drawAsOverlay(cf.impWork, qxyPx, Quadrant.COORDSTR_FEM);
+		IJX.rename(cf.impWork, Quadrant.WINTITLE_FEM2D);
+		
+		IJX.forceClose(impSagZ, impSagM);
+		
+		return cf.impWork;
+	}
+	
+	private QCurveFitter analyzeBlumensaat(ImagePlus impSagZ) {
+		int W0 = impSagZ.getWidth(); 
+		Calibration cal = impSagZ.getCalibration();
+		double pxSize = Math.sqrt(Math.pow(cal.pixelWidth, 2) + Math.pow(cal.pixelHeight, 2));
+		
+		ArrayList<Double> xList = new ArrayList<Double>(), yList = new ArrayList<Double>();
+		RTBoundary.getNotchRoofYZ(xList, yList);
+		
+		boolean continueFlag; int cnt = 1; QCurveFitter cf; 
+		do {
+			continueFlag = false;
+			double[] x = IJX.Util.list2array(xList), y = IJX.Util.list2array(yList); 
+			cf = new QCurveFitter(x, y); 
+			cf.doFit(CurveFitter.STRAIGHT_LINE);
+					
+			ImagePlus impS = impSagZ.duplicate();
+			IJ.run(impS, "RGB Color", "");
+			ColorProcessor cip = (ColorProcessor)impS.getProcessor();
+			cip.setLineWidth(1); cip.setColor(notchRoofColor);
+			
+			for (int i = 0; i < x.length; i++)
+				cip.fillRect((int)x[i] - 1, (int)y[i] - 1, 3, 3);
+			
+			cip.setColor(Quadrant.textColor);
+			int x1 = 0, y1 = (int)cf.f(0), x2 = W0 - 1, y2 = (int)cf.f(W0 - 1);
+			cip.drawLine(x1, y1, x2, y2);
+			
+			cip.drawString(cf.getResultString(), 0, 16);
+			impS.setTitle("KCAwork-Blumensaat_" + Integer.toString(cnt++));
+			impS.show();
+			
+			double residuals[] = cf.getResiduals(); double sd = cf.getSD();
+			for (int i = x.length - 1; i >= 0; i--) {
+				double r = Math.abs(residuals[i]);
+				boolean out = false;
+				
+				if (sd * pxSize > 5) {
+					if (r * pxSize >= 10) out = true;
+				} else if (sd * pxSize > 2.5 && (r > sd * 2 || r * pxSize >= 5))
+					out = true;
+				
+				if (out) {
+					xList.remove(i); yList.remove(i);
+					continueFlag = true;
+				}
+			}
+				
+			cf.repetition = cnt;
+			cf.impWork = impS;
+		} while (continueFlag);
+		
+		return cf;
+	}
 	
 	private XY[] getRefCoordsFem(ImagePlus impSagM, CurveFitter cf) {
 		int W0 = impSagM.getWidth(), H0 = impSagM.getHeight();
@@ -80,7 +167,7 @@ public class FemoralQuadrantDetector implements PlugIn {
 		return qxy;
 	}
 	
-	private static void correctHL100(ImagePlus impSagM, XY qxy[]) {
+	private void correctHL100(ImagePlus impSagM, XY qxy[]) {
 		double x1 = qxy[0].x, y1 = qxy[0].y, x2 = qxy[1].x, y2 = qxy[1].y, x3 = qxy[2].x, y3 = qxy[2].y;
 		
 		
@@ -96,9 +183,21 @@ public class FemoralQuadrantDetector implements PlugIn {
 			}
 		}
 	}
-
+	
+	
+	
 	
 }
+
+class QCurveFitter extends CurveFitter {
+	int repetition;
+	ImagePlus impWork;
+	
+	QCurveFitter(double x[], double y[]) {
+		super(x, y);
+	}
+}
+
 
 /*
 private XY[] getSystemCoordFem(mPointList refpl) {

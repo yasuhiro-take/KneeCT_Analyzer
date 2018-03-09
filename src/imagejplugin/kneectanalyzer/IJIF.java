@@ -334,46 +334,7 @@ public class IJIF implements Measurements {
 	
 	
 	
-	public static double createTibPlateau(ImagePlus impTibSag) {
-		IJ.run(impTibSag, "Fill Holes", "stack");
-		Calibration cal = impTibSag.getCalibration();
-		ImagePlus impTibSagZ = IJX.zproject(impTibSag);
-		impTibSagZ.show();
-		
-		SimpleRotateFilter srf = new SimpleRotateFilter(0);
-		WindowManager.setCurrentWindow(impTibSagZ.getWindow());
-		new PlugInFilterRunner(srf, null, null);
-		
-		if (!srf.wasOK)
-			return 0;
-		
-		int w = impTibSag.getWidth(), h = impTibSag.getHeight();
-		
-		RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
-		BoundaryData bd = rtb.getProximal(BD_TYPE[BoundaryData.FIB]);
-		if (bd == null)
-			bd = rtb.getDistal(BD_TYPE[BoundaryData.TIB]);
-			
-		XY fibYZ = new XY(bd.y + bd.h, bd.z);
-		XY center = new XY(w / 2, h / 2);
-		XY fibYZr = IJX.Util.rotateXY(fibYZ, center, srf.angle);
-		int z = (int)fibYZr.y;
-			
-		if (srf.angle != 0)
-			IJX.rotate(impTibSag, srf.angle);
-			
-		ImageStack ims = impTibSag.getImageStack().crop(0, 0, 0, w, z, impTibSag.getNSlices());
-		impTibSag.setStack(ims);
-		
-		ImagePlus impTP = IJX.createSag2Ax(impTibSag);
-		IJ.setThreshold(impTP, 64, 255, null); // TODO: threshold by user-defined ??
-		IJ.run(impTP, "Make Binary", "method=Default background=Default");
-		IJX.rename(impTP, "TibPlateau");
-		
-		IJX.forceClose(impTibSagZ);
-			
-		return srf.angle;
-	}
+	
 	
 	/*
 	 * Interface for dialog buttons 
@@ -421,10 +382,9 @@ public class IJIF implements Measurements {
 			imp.setCalibration(cal);
 			
 			if (rtboundary) {
-				RTBoundary rtb = new RTBoundary(WINTITLE_BOUNDARY);
-				if (rtb.isReal()) {
+				if (RTBoundary.isReal()) {
 					System.out.println("old version of resultstable boundary data is converted.");
-					rtb.real2px(cal);
+					RTBoundary.real2px(cal);
 				}
 			}
 			
@@ -685,6 +645,8 @@ public class IJIF implements Measurements {
 			if (ij3d)
 				IJIF3D.Quad.save(basepath);
 			
+			//IJIF.Modeler.save("TunOnlyFem", "TunOnlyTib");
+			
 			return 0;
 		}
 	
@@ -698,51 +660,19 @@ public class IJIF implements Measurements {
 			
 			if (fem) {
 				IJIF.notice("Analyzing femur...This may take some time...");
-				Quadrant.detectFemoralSystem();
+				//Quadrant.detectFemoralSystem();
+				(new FemoralQuadrantDetector()).directRun();
 			}
 			if (tib) {
 				IJIF.notice("Analyzing tibia...This may take some time...");
-				Quadrant.detectTibialSystem();
+				(new TibialQuadrantDetector()).directRun();
 			}
 				
 			return 0;
 		}
 		
 		public static int detectTunnel2D() {
-			int quadsys = Quadrant.SysCoord.getDetermined();
-			boolean pre[] = new boolean[] { ((quadsys & 1) != 0), ((quadsys & 2) != 0) };
-			//boolean pre[] = new boolean[] { (Quadrant.systemCoordFem != null), (Quadrant.systemCoordTib != null) };
-			boolean boo[] = IJX.generalFTDialog("Choice", "Check below for automatic tunnel detection.", 
-											"Tunnel", pre, pre);
-			if (boo == null)
-				return -1;
-			
-			boolean fem = boo[0], tib = boo[1];
-			
-			IJ.run("Set Measurements...", "area centroid display redirect=None decimal=3");
-			ResultsTable rtable = ResultsTable.getResultsTable();
-			if (rtable != null) rtable.reset();
-			
-			int rf = 0, rt = 0;
-			if (fem) {
-				IJIF.notice("Analyzing femoral tunnel...This may take some time...");
-				rf = Quadrant.detectFemoralTunnel();
-			}
-			if (tib) {
-				IJIF.notice("Analyzing tibial tunnel...This may take some time...");
-				rt = Quadrant.detectTibialTunnel();
-			}
-			
-			Quadrant.measurements2Coord();
-
-			if (rf == 0 && rt == 0)
-				return 0;
-			return -1;
-		}
-		
-		public static int refreshResults2D() {
-			Quadrant.measurements2Coord();
-			Quadrant.syncWithResults();
+			(new TunnelDetector()).run(null);
 			return 0;
 		}
 		
@@ -750,53 +680,7 @@ public class IJIF implements Measurements {
 			Quadrant.setSystem();
 			return 0;
 		}
-		/* 
-		 * After detecting q-system, dialog appeaered to ask if user agree with it.
-		public static int detectSystem2D() {
-			int quadsys = Quadrant.SysCoord.getDetermined();
-			boolean pre[] = new boolean[] { ((quadsys & 1) == 0), ((quadsys & 2) == 0) };
-			boolean boo[] = generalFTDialog("Choice", "Check below for automatic identification of quadrant coord system.", 
-											"Quadrant System", true, true, pre);
-			if (boo == null) return -1;
-			boolean fem = boo[0], tib = boo[1];
-			
-			ImagePlus impF = null, impT = null;
-			if (fem) impF = Quadrant.detectFemoralSystem(notchRoofX);
-			if (tib) impT = Quadrant.detectTibialSystem();
-				
-			if (impF != null || impT != null) {
-				ImagePlus impF2 = (impF != null) ? impF.flatten() : null;
-				ImagePlus impT2 = (impT != null) ? impT.flatten() : null;
-				if (impF2 != null) impF2.show(); if (impT2 != null) impT2.show();
-				
-				ImagePlus impC = IJX.createCombinedImage("Quadrant System", impF2, impT2);
-				impC.show(); 
-				WindowManager.toFront(WindowManager.getFrame("Quadrant System"));
-				WindowManager.setCurrentWindow(impC.getWindow());
-				IJX.forceClose(impF2, impT2);
-				
-				String msg = "";
-				if (fem && impF == null)
-					msg += "Failed in auto-identifying femoral quadrant coord system.\n";
-				if (tib && impT == null)
-					msg += "Failed in auto-identifying tibial quadrant coord system.\n";
-				msg += "Review the auto-identified quadrant coord system,\n";
-				msg += "and check below when you agree.";
-				
-				boolean boo2[] = generalFTDialog("Choice", msg, "Quadrant System",
-												(impF != null), (impT != null), new boolean[] {true,true});
-				if (boo2 == null) return -1;
-				
-				if (fem && !boo2[0]) Quadrant.systemCoordFem = null;
-				if (tib && !boo2[1]) Quadrant.systemCoordTib = null;
-				
-				IJX.forceClose(impC);
-				
-				if (boo2[0] || boo2[1])
-					return 0;
-			}
-			return -1;
-		}*/
+		
 		
 	}
 }
@@ -804,49 +688,5 @@ public class IJIF implements Measurements {
 abstract class IJIF_SwingWorker extends SwingWorker<Integer, String> {
 	abstract public Integer doInBackground();
 	abstract public void callback(String str);
-}
-
-
-
-class SimpleRotateFilter implements ExtendedPlugInFilter, DialogListener {
-	public boolean wasOK;
-	public double angle = 0;
-	
-	public SimpleRotateFilter(double initialAngle) {
-		angle = initialAngle;
-	}
-	
-	@Override
-	public int setup(String arg, ImagePlus imp) {
-		return DOES_ALL | SNAPSHOT;
-	}
-
-	@Override
-	public void run(ImageProcessor ip) {
-		ip.rotate(angle);
-	}
-
-	@Override
-	public boolean dialogItemChanged(GenericDialog gd, AWTEvent e) {
-		angle = gd.getNextNumber();
-		return true;
-	}
-
-	@Override
-	public int showDialog(ImagePlus imp, String command, PlugInFilterRunner pfr) {
-		GenericDialog gd = new GenericDialog("Rotate sagitally TibOnly");
-		gd.addMessage("Rotate the sagittal projection of TibOnly\nto obtain horizontal tibial plateau.");
-		gd.addNumericField("Angle: ", this.angle, 3);
-		gd.addPreviewCheckbox(pfr);
-		gd.addDialogListener(this);
-		gd.getPreviewCheckbox().setState(true);
-		gd.showDialog();
-		
-		wasOK = gd.wasOKed();
-		
-		return 0;
-	}
-
-	@Override public void setNPasses(int nPasses) {}
 }
 
