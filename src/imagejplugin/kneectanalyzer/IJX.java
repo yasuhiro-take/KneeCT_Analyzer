@@ -54,9 +54,9 @@ class IJX {
 	public static ImagePlus reslice(ImagePlus imp, double output, String start) {
 		String arg = "output="+output + " start="+start + " avoid";
 		
-		WindowManager.setCurrentWindow(imp.getWindow());
-		
-		IJ.run("Reslice [/]...", arg);
+		//WindowManager.setCurrentWindow(imp.getWindow());
+		IJ.run(imp, "Reslice [/]...", arg);
+		IJ.wait(50);
 		
 		return WindowManager.getCurrentImage();
 	}
