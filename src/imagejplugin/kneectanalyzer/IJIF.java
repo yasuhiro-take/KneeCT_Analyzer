@@ -34,7 +34,7 @@ public class IJIF implements Measurements {
 	public static boolean ij3d = false;
 	private static IJIF_SwingWorker callbackSwingWorker;
 	
-	private static mPointList fec;
+	//private static mPointList fec;
 	
 	static double minThreshold, maxThreshold;
 	
@@ -43,7 +43,7 @@ public class IJIF implements Measurements {
 	private static boolean initializedFlag;
 	private static String nonKCAtitle;
 	
-	private static final String FILENAME_FEC = "fec.points";
+	//private static final String FILENAME_FEC = "fec.points";
 	private static final String FILENAME_BOUNDARY = "boundary.txt";
 	
 	private static final String MD_THRESHOLD = "Threshold";
@@ -58,12 +58,10 @@ public class IJIF implements Measurements {
 		if (initializedFlag)
 			return;
 		
-		fec = null;
+		//fec = null;
 		//TPangle = 0;
 		initializedFlag = true;
 		minThreshold = maxThreshold = 0;
-		
-		Quadrant.init();
 		
 		try {
 			ij3d = (Class.forName("ij3d.Image3DUniverse") != null);			
@@ -131,7 +129,6 @@ public class IJIF implements Measurements {
 		return false;
 	}
 	
-	
 	public static void setCallback(IJIF_SwingWorker sw) {
 		callbackSwingWorker = sw; 
 	}
@@ -143,24 +140,6 @@ public class IJIF implements Measurements {
 			IJ.error(str);
 	}
 	
-	public static boolean isFEC() {
-		if (IJIF.fec != null && IJIF.fec.size() == 2)
-			return true;
-		return false;
-	}
-	
-	public static void setFEC(double xyz[]) {
-		if (fec == null)
-			fec = new mPointList();
-			
-		fec.clear();
-		fec.add("MFEC", xyz[0], xyz[1], xyz[2]);
-		fec.add("LFEC", xyz[3], xyz[4], xyz[5]);
-	}
-	
-	public static void setFEC(mPointList mpl) {
-		IJIF.fec = mpl;
-	}
 	
 	public static void saveAVI(ImagePlus imp, String path) {
 		String arg = "compression=PNG frame=" + String.valueOf(imp.getNSlices());
@@ -233,109 +212,6 @@ public class IJIF implements Measurements {
 	}
 	
 	
-	
-	private static Rect[] findMaxParticlePerSlice(ImagePlus imp) {
-		AnalyzeParticle ap = new AnalyzeParticle(300, imp.getCalibration(), "Area BX BY Width Height");
-		
-		int nSlices = imp.getNSlices();
-		Rect rect[] = new Rect[nSlices];
-		
-		for (int s = 0; s < nSlices; s++) {
-			int nResults = ap.newAnalyze(imp, s + 1);
-					
-			if (nResults > 0) {
-				double area[] = ap.getAllRowValues(0);
-				int row_maxarea = IJX.Util.getMaxIndex(area);
-				rect[s] = new Rect(ap.getMultiColumnValues(1, 4, row_maxarea));
-			}
-		}
-		
-		return rect;
-	}
-	
-	private static int[] getMaxParticleSlices(double b_area[]) {
-		int slices[] = new int[20];
-		double[] b_area_sorted = b_area.clone();
-		double[] b_area_unique = new double[b_area.length];
-		
-		Arrays.sort(b_area_sorted);
-		
-		double lastvalue = 0;
-		for (int i = b_area.length - 1, j = 0; i >= 0; i--)
-			if (b_area_sorted[i] != lastvalue)
-				b_area_unique[j++] = lastvalue = b_area_sorted[i];
-		
-		for (int s = 0, u = 0; s < 20 && u < b_area.length; u++) {
-			for (int i = 0; i < b_area.length; i++) {
-				if (b_area[i] == b_area_unique[u]) {
-					slices[s++] = i;
-					for (int j = Math.max(i - 5, 0); j <= Math.min(i + 5, b_area.length - 1); j++)
-						b_area[j] = 0;
-					i = b_area.length;
-				}
-			}
-		}
-		
-		return slices;
-	}
-	
-	private static int[] getMaximaParticleSlices(double b_area[]) {
-		int[] slices = null;
-		
-		try {
-			if (Class.forName("ij.plugin.filter.MaximumFinder") != null)
-				if (MaximumFinder.class.getMethod("findMaxima") != null)
-				slices = MaximumFinder.findMaxima(b_area, 1.0, 1);
-		} catch (ClassNotFoundException e) {
-			slices = getMaxParticleSlices(b_area);
-		} catch (NoSuchMethodException e) {
-			slices = getMaxParticleSlices(b_area);
-		}
-		
-		return slices;
-	}
-	
-	private static int determineFemEpiCondylesBy2D(ImagePlus imp) {
-		Rect rect[] = findMaxParticlePerSlice(imp);
-		double b_area[] = new double[imp.getNSlices()];
-		
-		for (int i = 0; i < b_area.length; i++)
-			b_area[i] = (rect[i] != null) ? rect[i].w * rect[i].h : 0;
-		
-		
-		int[] slices = getMaximaParticleSlices(b_area);
-		String msg = "Please choose the most probable epicondyle-containing slice.";
-		
-		SliceChooseFilter scf = new SliceChooseFilter(slices, "Select Epicondyle Slice", msg);			 
-		
-		imp.getWindow().toFront();
-		WindowManager.setCurrentWindow(imp.getWindow());
-		
-		new PlugInFilterRunner(scf, null, null);
-		
-		if (!scf.wasOK)
-			return -1;
-		
-		int s = slices[scf.getChoice()];
-		
-		Calibration cal = imp.getCalibration();
-		double xyz[] = new double[6];
-		xyz[0] = rect[s].x; 
-		xyz[1] = rect[s].y + rect[s].h / 2; 
-		xyz[2] = s * cal.pixelDepth;
-		xyz[3] = xyz[0] + rect[s].w; 
-		xyz[4] =xyz[1]; 
-		xyz[5] = xyz[2];
-		
-		setFEC(xyz);
-		
-		return 0;
-	}
-	
-	
-	
-	
-	
 	/*
 	 * Interface for dialog buttons 
 	 * 
@@ -390,7 +266,6 @@ public class IJIF implements Measurements {
 			
 			//IJIF.fec = IJX.loadPointList(dir, IJIF.FILENAME_FEC);
 			
-			Quadrant.init();
 			Quadrant.load(dir);
 				
 			for (String m: models) {
@@ -423,8 +298,6 @@ public class IJIF implements Measurements {
 	}
 	
 	public static int closeWorkingFiles(String... wintitles) {
-		IJIF.fec = null;
-		
 		for (String win: wintitles) 
 			IJX.forceClose(win);
 		
@@ -447,8 +320,6 @@ public class IJIF implements Measurements {
 		
 		if (ij3d)
 			IJIF3D.close();
-		
-		Quadrant.init();
 		
 		return 0;
 	}
@@ -493,9 +364,6 @@ public class IJIF implements Measurements {
 						ResultsTable rt = IJX.getResultsTable(WINTITLE_BOUNDARY);
 						if (rt != null)
 							rt.save(IJX.Util.createPath(basepath, FILENAME_BOUNDARY));
-					
-						if (IJIF.fec != null && IJIF.fec.size() >= 2)
-							IJX.savePointList(IJIF.fec, basepath, IJIF.FILENAME_FEC);
 					} else if (imp != null) {
 						notice("Saving " + m + "...");
 						saveAVI(imp, IJX.Util.createPath(basepath, m + ".avi"));
@@ -667,7 +535,7 @@ public class IJIF implements Measurements {
 				IJIF.notice("Analyzing tibia...This may take some time...");
 				(new TibialQuadrantDetector()).directRun();
 			}
-				
+			
 			return 0;
 		}
 		
@@ -678,6 +546,11 @@ public class IJIF implements Measurements {
 		
 		public static int determineSystem2D() {
 			Quadrant.setSystem();
+			return 0;
+		}
+		
+		public static int refreshResults() {
+			Quadrant.updateResults();
 			return 0;
 		}
 		
