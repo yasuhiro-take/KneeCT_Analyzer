@@ -61,164 +61,6 @@ class QRoi {
 	}
 }
 
-class QRoiList {
-	ArrayList<QRoi> qroiList;
-	int apertureCounter;
-	
-	public QRoiList() {
-		qroiList = new ArrayList<QRoi>();
-		apertureCounter = 1;
-	}
-	public QRoiList(ArrayList<QRoi> list) {
-		qroiList = list;
-		apertureCounter = 1;
-	}
-	public void add(QRoi qroi) {
-		qroiList.add(qroi);
-	}
-	public void add(Roi r, int z, boolean isAperture, int apertureID) {
-		if (isAperture)
-			apertureID = apertureCounter++;
-		qroiList.add(new QRoi(r, z, isAperture, apertureID));
-	}
-	
-	
-	public int size() {
-		return qroiList.size();
-	}
-	
-	public QRoi findAperture(int id) {
-		for (QRoi qroi: qroiList)
-			if (qroi.isAperture && qroi.apertureID == id)
-				return qroi;
-		return null;
-	}
-	
-	public QRoi findAperture(XY xy, Calibration cal) {
-		XY xyPx = xy.clonePixelized(cal);
-		
-		for (QRoi qroi: qroiList) {
-			if (qroi.isAperture) {
-				Rect r = new Rect(qroi.roi.getBounds());
-				
-				if (r.isInside(xyPx))
-					return qroi;
-			}
-		}
-		return null;		
-	}
-	
-	public int findClearedAperture(String labelRegex, Calibration cal, ResultsTable rt) {
-		for (QRoi qroi: qroiList) {
-			if (qroi.isAperture) {
-				Rect r = new Rect(qroi.roi.getBounds());
-				r.px2real(cal);
-				boolean isInRT = false;
-				for (int i = 0; i < rt.size(); i++) {
-					if (rt.getLabel(i).matches(labelRegex)) {
-						XY xy = new XY(rt.getValue("X", i), rt.getValue("Y", i));
-											
-						if (r.isInside(xy))
-							isInRT = true;
-					}
-				}
-				
-				if (isInRT == false)
-					return qroi.apertureID;
-			}
-		}
-			
-		return -1;	
-	}
-	
-	public int findClearedAperture(String indexlabel, ResultsTable rt) {
-		for (QRoi qroi: qroiList) {
-			if (qroi.isAperture) {
-				String label = indexlabel + ":"+qroi.apertureID;
-				
-				boolean cleaered = true;
-				for (int i = 0; i < rt.size(); i++) 
-					if (rt.getLabel(i).equals(label))
-						cleaered = false;
-				
-				if (cleaered)
-					return qroi.apertureID;
-			}
-		}
-		return -1;
-	}
-	
-	public void removeByID(int apertureID) {
-		for (int i = qroiList.size() - 1; i >= 0; i--) { 
-			QRoi qroi = qroiList.get(i);
-			if (qroi.apertureID == apertureID) {
-				qroiList.remove(i);
-			}
-		}
-	}
-	
-	public void sync(String labelRegex, Calibration cal, ResultsTable rt) {
-		int id;
-		while ((id = this.findClearedAperture(labelRegex, cal, rt)) != -1)
-			removeByID(id);
-	}
-	
-	public void sync(String indexlabel, ResultsTable rt) {
-		int id;
-		while ((id = this.findClearedAperture(indexlabel, rt)) != -1)
-			removeByID(id);
-	}
-	
-	public void toResults(Analyzer analyzer, ImagePlus imp) {
-		for (QRoi r: qroiList) {
-			if (r.isAperture) {
-				imp.setRoi(r.roi);
-				analyzer.measure();
-				
-			}
-		}
-		
-		imp.killRoi();
-	}
-	
-	/*
-	public void toResults(ImagePlus imp) {
-		IJ.run("Set Measurements...", "area centroid display redirect=None decimal=3");
-		if (!IJ.isResultsWindow())
-			IJ.getTextPanel();
-		
-		Analyzer analyzer = new Analyzer(imp);
-		toResults(analyzer, imp);
-		
-		ResultsTable rt = Analyzer.getResultsTable();
-		rt.updateResults();
-		rt.show("Results");
-	}
-	*/
-	
-	
-	public Overlay toOverlay(Overlay overlay) {
-		
-		overlay.drawLabels(true);
-		overlay.drawNames(true);
-		
-		for (QRoi r: qroiList) {
-			if (r.isAperture) {
-				r.roi.setLocation(r.x, r.y);
-				overlay.add(r.roi);
-			}
-		}
-		
-		return overlay;
-	}
-	
-	public void removeFromOverlay(Overlay overlay) {
-		for (QRoi r: qroiList) {
-			if (r.isAperture)
-				overlay.remove(r.roi);
-		}
-	}
-}
 
 class Quadrant  {
 	static final int FEM=1, TIB=2;
@@ -369,11 +211,6 @@ class Quadrant  {
 		}
 	}
 	
-	public static void init() {
-		//systemCoordFem = null; systemCoordTib = null;
-		//tunnelRoisFem = null; tunnelRoisTib = null;
-		//tunnelRois[1] = tunnelRois[2] = null;
-	}
 	/*
 	 * deprecated. use SysCoord.getDetermined()
 	public static int systemDetermined() {
@@ -391,6 +228,18 @@ class Quadrant  {
 		//if (tunnelRois[TIB] != null) r |= TIB;
 		if (WindowManager.getImage("TunOnlyFem") != null) r |= FEM;
 		if (WindowManager.getImage("TunOnlyTib") != null) r |= TIB;
+		return r;
+	}
+	
+	public static int getTunnelResults() {
+		int r = 0;
+		ResultsTable rt = Analyzer.getResultsTable();
+		if (rt != null) {
+			for (int i = 0; i < rt.size(); i++) {
+				if (rt.getLabel(i).startsWith(WINTITLE_FEM2D)) r |= FEM;
+				if (rt.getLabel(i).startsWith(WINTITLE_TIB2D)) r |= TIB;
+			}
+		}
 		return r;
 	}
 	
@@ -511,6 +360,30 @@ class Quadrant  {
 		
 		//imp is shown already.
 		return imp;
+	}
+	
+	public static void updateResults(ResultsTable rt) {
+		if (rt == null) return;
+		
+		for (int i = 0; i < rt.size(); i++) {
+			int ft = 0;
+			if (rt.getLabel(i).startsWith("Femoral")) ft = FEM;
+			if (rt.getLabel(i).startsWith("Tibial")) ft = TIB;
+			
+			XY centroid = new XY(rt.getValue("X", i), rt.getValue("Y", i));
+			XY quad = Quadrant.calcCoord(ft, centroid);
+			
+			rt.setValue("QuadX", i, quad.x);
+			rt.setValue("QuadY", i, quad.y);
+		}
+	}
+	
+	public static void updateResults() {
+		ResultsTable rt = Analyzer.getResultsTable();
+		if (rt != null && rt.size() > 0) {
+			updateResults(rt);
+			rt.show("Results");
+		}
 	}
 	
 	/*
