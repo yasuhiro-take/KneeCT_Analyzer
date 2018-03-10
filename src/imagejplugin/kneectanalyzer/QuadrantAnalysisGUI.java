@@ -27,6 +27,7 @@ import java.util.List;
 
 import javax.swing.JTextPane;
 
+import ij.WindowManager;
 import imagejplugin.kneectanalyzer.IJIF;
 
 
@@ -43,8 +44,8 @@ public class QuadrantAnalysisGUI {
 	private JLabel label_1L, label_2L, label_3L, label_4L;
 	private JToggleButton tbtn1, tbtn2;
 	
-	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "" };
-	private String[] btntitles3D = { "3D Viewer", "Manual-set Quadrant System", "Refresh Results", "Snapshot" };
+	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results" };
+	private String[] btntitles3D = { "3D Viewer", "Manual-set Quadrant System", "Measure ROI", "Snapshot" };
 	private static ImageIcon icons[];
 	private static String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
 	private static int mode2D3D = 1;
@@ -72,6 +73,12 @@ public class QuadrantAnalysisGUI {
 					QuadrantAnalysisGUI window = new QuadrantAnalysisGUI();
 					window.frame.setVisible(true);
 					opened = true;
+					
+					java.awt.Window win = WindowManager.getWindow("Console");
+					if (win != null) 
+						win.setVisible(false);
+					
+
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -202,8 +209,7 @@ public class QuadrantAnalysisGUI {
 		btn_4 = new JButton(btntitles[3]);
 		frame.getContentPane().add(btn_4, "4, 16, 5, 1");
 		btn_4.addActionListener(new btnActionListener());
-		if (mode2D3D == 1)
-			btn_4.setEnabled(false);
+		//if (mode2D3D == 1) 	btn_4.setEnabled(false);
 		
 		JSeparator separator_1 = new JSeparator();
 		frame.getContentPane().add(separator_1, "2, 18, 9, 1");
@@ -280,16 +286,21 @@ public class QuadrantAnalysisGUI {
 			if (qsystem == 3) {
 				msg = "Quadrant coordinates were successfully determined. ";
 				msg += "You may want to proceed to *" + btntitles[2] + "*.";
-				msg += " You can save quadrant system coord. data (*floppy icon*).";
+				msg += " You can save quadrant system coord (*floppy icon*).\n";
 				label_3L.setIcon(arrowR);
 				label_save.setIcon(arrowD);
 			} else {
 				msg = "Available Quadrant system: " + quadStatus[qsystem] + ".\n";
 				msg += "Proceed to *"+btntitles[1]+"* to manually determine Quadrant coordinates, or *";
-				msg += btntitles[2]+"* for available system.";
+				msg += btntitles[2]+"* for available system.\n";
 				label_2L.setIcon(arrowR);
 				label_3L.setIcon(arrowR);
 			}
+			if (Quadrant.getTunnelResults() != 0) {
+				msg += "You can refresh Quadrant Coord in Results (*" + btntitles[3] + "*).";
+				label_4L.setIcon(arrowR);
+			}
+			
 			messageBox.setText(msg);
 			break;
 		} 
@@ -311,17 +322,12 @@ public class QuadrantAnalysisGUI {
 			
 		}
 		case 4: {
-			/*
-			String msg = "Results & internal data are refreshed.\n";
-			msg += "You can repeat *"+btntitles[2]+"* and *"+btntitles[3]+"*.\n";
-			msg += "Copy the QuadX & Y data in Results to a spreadsheet software, or just save them through IJ.\n";
-			msg += "You can save the 3D coords of tunnel locations (X, Y & Z in Results) in KCA folder ";
-			msg += "(*floppy icon*).";
+			String msg = "QuadX & QuadY in Results are just recalculated. ";
+			msg += "You can save data in KCA folder ";
+			msg += "(*floppy icon*).\n";
+			
 			messageBox.setText(msg);
-			label_3L.setIcon(arrowR);
-			label_4L.setIcon(arrowR);
 			label_save.setIcon(arrowD);
-			*/
 			break;
 		}
 			
@@ -347,6 +353,28 @@ public class QuadrantAnalysisGUI {
 	void suggestion3D(int ret) {
 		resetLabelIcons();
 		
+		if (IJIF.checkModels("FemOnly", "TibOnly")) {
+			int qsystem = Quadrant.SysCoord.getDetermined();
+			String msg = "Model data OK.\n";
+			msg += "Determined Quadrant System: " + quadStatus[qsystem] + ".\n";
+		
+			if (IJIF3D.getVisibleFT() == 0) {
+				msg += "Create 3D model first (*" + btntitles3D[0] + "*).";
+				label_1L.setIcon(arrowR);
+			} else {
+				msg += "You can determine/edit quadrant system manually (*" +btntitles3D[1];
+				msg += "*).\n";
+				msg += "You can measure a tunnel center using ROI tool, followed by *" + btntitles3D[2];
+				msg += "* to calculate its quadrant coord.";
+				
+				label_2L.setIcon(arrowR);
+				label_3L.setIcon(arrowR);	
+			}
+			
+			messageBox.setText(msg);	
+		}
+		
+		/*
 		switch (status) {
 		case 0:
 		case 1:
@@ -388,6 +416,7 @@ public class QuadrantAnalysisGUI {
 			break;
 		} 
 		}
+		*/
 		
 		frame.toFront();
 		
@@ -427,7 +456,7 @@ public class QuadrantAnalysisGUI {
 				btn_2.setText(btntitles[1]);
 				btn_3.setText(btntitles[2]);
 				btn_4.setText(btntitles[3]);
-				btn_4.setEnabled(false);
+				//btn_4.setEnabled(false);
 				tbtn1.setSelected(true);
 				tbtn2.setSelected(false);
 				status = (status >= 3) ? 3 : 0;
@@ -437,7 +466,7 @@ public class QuadrantAnalysisGUI {
 				btn_2.setText(btntitles3D[1]);
 				btn_3.setText(btntitles3D[2]);
 				btn_4.setText(btntitles3D[3]);
-				btn_4.setEnabled(true);
+				//btn_4.setEnabled(true);
 				tbtn1.setSelected(false);
 				tbtn2.setSelected(true);
 				status = (status >= 3) ? 3 : 0;
@@ -500,7 +529,7 @@ public class QuadrantAnalysisGUI {
 				
 				break;
 			case '1':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3D(true);
+				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3dOne(true);
 				break;
 			case '2':
 				r = (mode2D3D == 1) ? IJIF.Quad.determineSystem2D() : IJIF3D.Quad.determineSystem3D();
@@ -509,7 +538,7 @@ public class QuadrantAnalysisGUI {
 				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
 				break;
 			case '4':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() : IJIF3D.Quad.snapshot();
+				r = (mode2D3D == 1) ? IJIF.Quad.refreshResults() : IJIF3D.Quad.snapshot();
 				break;
 			} 
 			
@@ -551,7 +580,7 @@ public class QuadrantAnalysisGUI {
 					
 					break;
 				case 's':
-					if (status == 3 && mode2D3D == 1)
+					if (status >= 3 && mode2D3D == 1)
 						status = 5;
 					
 					suggestion();
