@@ -1,6 +1,8 @@
 package imagejplugin.kneectanalyzer;
 
+import ij.IJ;
 import ij.ImagePlus;
+import ij.WindowManager;
 import ij.measure.Calibration;
 import ij.plugin.ImageCalculator;
 import ij.plugin.PlugIn;
@@ -10,6 +12,11 @@ public class FTDivider implements PlugIn {
 	private static final String WINTITLE_BOUNDARY = AnatomyDetector.WINTITLE_BOUNDARY;
 	
 	@Override public void run(String arg) {
+		ImagePlus imp = WindowManager.getCurrentImage();
+		if (imp != null && imp.getNSlices() > 1 && IJX.getResultsTable(WINTITLE_BOUNDARY) != null)
+			directRun(imp);
+		else
+			IJ.error("no image, not a stack, or no boundary data.");
 	}
 	
 	public int directRun(ImagePlus imp) {

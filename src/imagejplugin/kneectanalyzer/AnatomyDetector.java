@@ -50,6 +50,13 @@ public class AnatomyDetector implements PlugIn, ImageListener {
 	private RoiManager rm;
 	
 	@Override public void run(String arg) {
+		ImagePlus imp = WindowManager.getCurrentImage();   
+		if (imp == null) {
+			IJ.noImage();
+			return;
+		}
+		
+		directRun(imp);
 	}
 	
 	public int directRun(ImagePlus imp) {
@@ -304,9 +311,6 @@ class AnatomyDetectorDialog implements ExtendedPlugInFilter, DialogListener, Lis
 		list.setModel(listModel);
 		list.setPrototypeCellValue("xxxxxxxxx ");		
 		list.addListSelectionListener(this);
-		//list.addKeyListener(ij);
-		//list.addMouseListener(this);
-		//list.addMouseWheelListener(this);
 		if (IJ.isLinux()) list.setBackground(Color.white);
 		JScrollPane scrollPane = new JScrollPane(list, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 		

@@ -42,7 +42,7 @@ public class OrthogonalTransformer implements PlugIn {
 		
 		lastImpAx = impOriginal;
 		
-		notice("Creating orthogonal projections... \nThis takes some moments.");
+		IJ.showStatus("Creating orthogonal projections...");
 		
 		Calibration cal = impOriginal.getCalibration();
 		impstack[I_AXIAL] = impOriginal.duplicate(); // axial
@@ -80,8 +80,7 @@ public class OrthogonalTransformer implements PlugIn {
 				return -1;
 			else { // END_APPLY | END_OK
 				if (mf.isChanged()) {
-					notice(null);
-					notice("Transforming stacks...\nThis takes some moments.");
+					IJ.showStatus("Transforming stacks...");
 					double a[] = mf.getAngles();
 					boolean f[] = mf.getFlipflags();
 					
@@ -147,11 +146,6 @@ public class OrthogonalTransformer implements PlugIn {
 				impstack[i] = null;
 			}
 		}
-	}
-	
-	static private void notice(String message) {
-		//IJ.log(message);
-		IJIF.notice(message);
 	}
 	
 	static private double[] getAnglesBy2P(mPointList pl) {

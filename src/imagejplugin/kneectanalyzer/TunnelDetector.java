@@ -59,10 +59,12 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 			return;
 		}
 		
-		int ft = dialog(quadsys);
-		if (ft == FEM) detectFemoralTunnel();
-		else if (ft == TIB) detectTibialTunnel();
+		int ft = dialog(quadsys), r;
+		if (ft == FEM) r = detectFemoralTunnel();
+		else if (ft == TIB) r = detectTibialTunnel();
 		else return;
+		
+		if (r != 0) return;
 		
 		imp2D = Quadrant.get2DImage(ft, true);
 		drawTunnelApertures(imp2D, tunnelRois);
@@ -72,7 +74,7 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		//analyzer = new Analyzer(imp2D, AREA | CENTER_OF_MASS | LABELS, rt);
 		tunnelRois.toResults(analyzer, imp2D);
 		
-		int r = startTunnelEditor(rt);
+		r = startTunnelEditor(rt);
 		if (r == 0) {
 			outputToResults(ft);
 			createTunnelModel(ft);
@@ -84,9 +86,13 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	}
 	
 	public int detectFemoralTunnel() {
+		ImagePlus impF;
+		if ((impF = WindowManager.getImage("FemOnly")) == null)
+			return IJX.error("FemOnly not found.", -1);
+		
 		int nrx = RTBoundary.getSplitX();
 		
-		ImagePlus impFem = WindowManager.getImage("FemOnly").duplicate();
+		ImagePlus impFem = impF.duplicate();
 		impFem.show();
 		IJ.run(impFem, "Fill Holes", "stack");
 		
@@ -107,6 +113,9 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	
 	public int detectTibialTunnel() {
 		ImagePlus impTib = WindowManager.getImage("TibOnly");
+		if (impTib == null)
+			return IJX.error("TibOnly not found.", -1);
+		
 		ImagePlus impSag = IJX.createAx2Sag(impTib);
 		
 		IJ.run(impSag, "Fill Holes", "stack");

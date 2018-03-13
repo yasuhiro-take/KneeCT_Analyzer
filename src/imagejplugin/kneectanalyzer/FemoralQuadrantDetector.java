@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 import ij.IJ;
 import ij.ImagePlus;
+import ij.WindowManager;
 import ij.gui.Line;
 import ij.measure.Calibration;
 import ij.measure.CurveFitter;
@@ -22,7 +23,13 @@ public class FemoralQuadrantDetector implements PlugIn {
 	public FemoralQuadrantDetector() {
 	}
 	
-	@Override public void run(String arg) {		// TODO Auto-generated method stub
+	@Override public void run(String arg) {
+		if (WindowManager.getImage("FemOnly") == null) {
+			IJX.error("FemOnly not found.");
+			return;
+		}
+		
+		directRun();
 	}
 	
 	public ImagePlus directRun() {

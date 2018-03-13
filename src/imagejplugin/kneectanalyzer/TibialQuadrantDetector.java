@@ -10,14 +10,24 @@ import ij.gui.DialogListener;
 import ij.gui.GenericDialog;
 import ij.gui.Line;
 import ij.measure.Calibration;
+import ij.plugin.PlugIn;
 import ij.plugin.filter.ExtendedPlugInFilter;
 import ij.plugin.filter.PlugInFilterRunner;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import imagejplugin.kneectanalyzer.Quadrant.SysCoord;
 
-public class TibialQuadrantDetector { 
+public class TibialQuadrantDetector implements PlugIn { 
 	public TibialQuadrantDetector() {
+	}
+	
+	@Override public void run(String arg) {
+		if (WindowManager.getImage("TibOnly") == null) {
+			IJX.error("TibOnly not found.");
+			return;
+		}
+		
+		directRun();
 	}
 	
 	public ImagePlus directRun() {
