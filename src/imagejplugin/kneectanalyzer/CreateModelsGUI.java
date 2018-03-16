@@ -1,58 +1,32 @@
 package imagejplugin.kneectanalyzer;
 
-import java.awt.EventQueue;
-
-import javax.swing.JFrame;
-
-import com.jgoodies.forms.layout.FormLayout;
-import com.jgoodies.forms.layout.ColumnSpec;
-import com.jgoodies.forms.layout.RowSpec;
-import com.jgoodies.forms.factories.FormFactory; 
-
-import javax.swing.JLabel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JSeparator;
-
-import java.awt.event.ActionListener;
-import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
-
-import java.util.List;
-
-import javax.swing.JTextPane;
+import java.awt.Frame;
 
 import imagejplugin.kneectanalyzer.IJIF;
 
-public class CreateModelsGUI {
-	private static boolean opened;
-	
-	private String wintitle;
-	private JFrame frame;
-	private JButton btn_1, btn_2, btn_3, btn_4, btn_open, btn_save, btn_close;
+public class CreateModelsGUI extends CommonGUI {
 	private int status;
+	private String wintitle;
+	
+	/*
+	
+	
+	private JButton btn_open, btn_save, btn_close, btn_q;
+	private Button btn_1, btn_2, btn_3, btn_4;
+	
 	private JTextPane messageBox;
 	private ImageIcon arrowR, arrowD;
 	private JLabel label_open, label_save, label_close;
 	private JLabel label_1L, label_2L, label_3L, label_4L;
+	*/
 	
-	
-	private String[] btntitles = { "Alignment correction", "Binarize", "Detect Anatomy", "Auto Edit" };
-	private static ImageIcon icons[];
+	private static final String[] btntitles = { "Correct Alignment", "Binarize", "Detect Anatomy", "Divide F/T" };
 	
 	/**
 	 * Launch the application.
 	 */
-	public static void main(ImageIcon icons[], String[] args) {
-		CreateModelsGUI.icons = icons;
-		
-		main(args);
-	}
 	
+	/*
 	public static void main(String[] args) {
 		if (opened) {
 			System.out.println("Create Models UI already exists.");
@@ -64,7 +38,9 @@ public class CreateModelsGUI {
 			public void run() {
 				try {
 					CreateModelsGUI window = new CreateModelsGUI();
+					WindowManager.addWindow(window.frame);
 					window.frame.setVisible(true);
+					
 					opened = true;
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -72,310 +48,94 @@ public class CreateModelsGUI {
 			}
 		});
 	}
+	*/
 
-	/**
-	 * Create the application.
-	 */
-	public CreateModelsGUI() {
+	public CreateModelsGUI(Frame instance) {
+		super(instance, btntitles);
 		status = 0;
 		wintitle = null;
 		IJIF.initIJIF();
 		
-		initialize();
 		suggestion();
 	}
-
-	/**
-	 * Initialize the contents of the frame.
-	 */
-	private void initialize() {
-		frame = new JFrame();
-		frame.setBounds(100, 100, 350, 400);
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		frame.getContentPane().setLayout(new FormLayout(new ColumnSpec[] {
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				ColumnSpec.decode("max(56dlu;default):grow"),
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,},
-			new RowSpec[] {
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				RowSpec.decode("default:grow"),})); 
-		
-		label_open = new JLabel("");	
-		frame.getContentPane().add(label_open, "2, 2, center, default");
-		arrowD = icons[4];
-		
-		label_save = new JLabel("");
-		frame.getContentPane().add(label_save, "4, 2, center, default");
-		
-		label_close = new JLabel("");
-		frame.getContentPane().add(label_close, "6, 2, center, default");
-		
-		btn_open = new JButton("");
-		btn_open.setIcon(icons[0]);
-		frame.getContentPane().add(btn_open, "2, 4");
-		btn_open.addActionListener(new btnActionListener());
-		
-		btn_save = new JButton("");
-		btn_save.setIcon(icons[1]);
-		frame.getContentPane().add(btn_save, "4, 4");
-		btn_save.addActionListener(new btnActionListener());
-		
-		btn_close = new JButton("");		
-		btn_close.setIcon(icons[2]);
-		frame.getContentPane().add(btn_close, "6, 4");
-		btn_close.addActionListener(new btnActionListener());
-		
-		JButton button_q = new JButton("");
-		button_q.setIcon(icons[3]);
-		frame.getContentPane().add(button_q, "10, 4");
-		
-		JSeparator separator = new JSeparator();
-		frame.getContentPane().add(separator, "2, 6, 9, 1");
-		
-		label_1L = new JLabel("");
-		frame.getContentPane().add(label_1L, "2, 8, center, default");
-		arrowR = icons[5];
-		
-		btn_1 = new JButton(btntitles[0]);
-		/* btn_1.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-			}
-		});*/
-		frame.getContentPane().add(btn_1, "4, 8, 5, 1");
-		btn_1.addActionListener(new btnActionListener());
-		
-		label_2L = new JLabel("");
-		frame.getContentPane().add(label_2L, "2, 10");
-		
-		btn_2 = new JButton(btntitles[1]);
-		frame.getContentPane().add(btn_2, "4, 10, 5, 1");
-		btn_2.addActionListener(new btnActionListener());
-		
-		label_3L = new JLabel("");
-		frame.getContentPane().add(label_3L, "2, 12");
-		
-		btn_3 = new JButton(btntitles[2]);
-		frame.getContentPane().add(btn_3, "4, 12, 5, 1");
-		btn_3.addActionListener(new btnActionListener());
-		
-		label_4L = new JLabel("");
-		frame.getContentPane().add(label_4L, "2, 14");
-		
-		btn_4 = new JButton(btntitles[3]);
-		frame.getContentPane().add(btn_4, "4, 14, 5, 1");
-		btn_4.addActionListener(new btnActionListener());
-		
-		JSeparator separator_1 = new JSeparator();
-		frame.getContentPane().add(separator_1, "2, 16, 9, 1");
-		
-		messageBox = new JTextPane();
-		messageBox.setEditable(false);
-		frame.getContentPane().add(messageBox, "2, 18, 9, 1, fill, fill");
-		
-		frame.addWindowListener(new frameWindowListener());
-	}
 	
-	class frameWindowListener implements WindowListener {
-
-		@Override public void windowActivated(WindowEvent arg0) {}
-
-		@Override public void windowClosed(WindowEvent arg0) {
-			// TODO Auto-generated method stub
-			opened = false;
-		}
-
-		@Override public void windowClosing(WindowEvent arg0) {}
-		@Override public void windowDeactivated(WindowEvent arg0) {}
-		@Override public void windowDeiconified(WindowEvent arg0) {}
-		@Override public void windowIconified(WindowEvent arg0) {}
-		@Override public void windowOpened(WindowEvent arg0) {}
-	}
-	
-	class btnActionListener implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			Object o = e.getSource();
-			char btn = ' ';
-			
-			if (o == btn_open) btn = 'o';
-			else if (o == btn_save) btn = 's';
-			else if (o == btn_close) btn = 'c';
-			else if (o == btn_1) btn = '1';
-			else if (o == btn_2) btn = '2';
-			else if (o == btn_3) btn = '3';
-			else if (o == btn_4) btn = '4';
-			
-			btnSwingWorker sw = new btnSwingWorker(btn);
-			sw.execute();
-		}
-	}
-	
-	class btnSwingWorker extends IJIF_SwingWorker {
-		private char btn;
-		private String message;
+	@Override int executeCommand(char btn) {
+		int r = -1;;
 		
-		public btnSwingWorker(char btnType) 
-		{
-			btn = btnType;
-			message = "";
+		switch(btn) {
+		case 'o':
+			r = IJIF.openKCADirectory();
+			if (r == 0)
+				wintitle = IJIF.getOpenedTitle();
+			else 
+				r = (r > 0) ? 0 : -1;
 			
-			frame.getGlassPane().addMouseListener(new MouseAdapter() {
-				public void mousePressed(MouseEvent e) {
-					e.consume();
-				}
-			});
-			frame.getGlassPane().setVisible(true);
-		}
-		
-		@Override
-		public Integer doInBackground() {
-			int r = -1;
-			IJIF.setCallback(this);
-			
-			switch(btn) {
-			case 'o':
-				r = IJIF.openKCADirectory();
-				if (r == 0)
-					wintitle = IJIF.getOpenedTitle();
-				else 
-					r = (r > 0) ? 0 : -1;
+			break;
+		case 's':
+			if (status == 4)
+				r = IJIF.Modeler.save("Base", "TibOnly", "FemOnly");
+			else if (status == 3)
+				r = IJIF.Modeler.save("Base");
+			else
+				r = IJIF.Modeler.saveOpened();
 				
-				break;
-			case 's':
-				if (status == 4)
-					r = IJIF.Modeler.save("Base", "TibOnly", "FemOnly");
-				else if (status == 3)
-					r = IJIF.Modeler.save("Base");
-				else
-					r = IJIF.Modeler.saveOpened();
-					
-				r = 0;
-				break;
-			case 'c':
-				r = IJIF.closeWorkingFiles(wintitle, "Aligned "+wintitle, "Base", "TibOnly", "FemOnly");
-				break;
-			case '1':
-				r = IJIF.Modeler.align();
-				break;
-			case '2':
-				r = IJIF.Modeler.binarize(); 
-				break;
-			case '3':
-				r = IJIF.Modeler.detectAnatomy();
-				break;
-			case '4':
-				r = IJIF.Modeler.autoEdit();
-				break;
-			} 
-			
-			return (Integer)(r);
+			r = 0;
+			break;
+		case 'c':
+			r = IJIF.closeWorkingFiles(wintitle, "Aligned "+wintitle, "Base", "TibOnly", "FemOnly");
+			break;
+		case '1':
+			r = IJIF.Modeler.align();
+			break;
+		case '2':
+			r = IJIF.Modeler.binarize(); 
+			break;
+		case '3':
+			r = IJIF.Modeler.detectAnatomy();
+			break;
+		case '4':
+			r = IJIF.Modeler.autoEdit();
+			break;
 		}
 		
-		public void callback(String str) {
-			if (str == null)
-				message = "";
-			else {
-				message += str + "\n";
-				publish(message);
-			}
-		}
-		
-		@Override
-		protected void process(List<String> l) {
-			messageBox.setText(l.get(0));
-			frame.toFront();
-		}
-		
-		@Override
-		protected void done() {
-			Integer r;
-			
-			try {
-				r = get();
-			} catch (Exception ex) {
-				r = -1;
-				IJX.error(ex.toString(), 0);
-				ex.printStackTrace();
-			}
-			
-			IJIF.setCallback(null);
-			
-			switch(btn) {
-				case 'o':
-					suggestion();
-					
-					break;
-				case 's':
-					if (status == 4)
-						status = 5;
-					
-					suggestion();
-					
-					break;
-				case 'c':
-					status = 0;
-					wintitle = null;
-					resetLabelIcons();
-					suggestion();
-					break;
-				case '1':
-				case '2':
-				case '4':
-					if (r == 0)
-						status = Character.getNumericValue(btn);
-					else
-						status = -1;
-
-					suggestion();
-					break;
-				case '3':
-					status = 3;
-					suggestion();
-					break;
-				
-			}
-			
-			frame.getGlassPane().setVisible(false);
-            MouseListener[] listeners = frame.getGlassPane().getMouseListeners();
-            
-            for (MouseListener listener: listeners) {
-                frame.getGlassPane().removeMouseListener(listener);
-            }
-		}
+		return r;
 	}
 	
-	private void resetLabelIcons()
-	{
-		label_open.setIcon(null);
-		label_save.setIcon(null);
-		label_close.setIcon(null);
-		label_1L.setIcon(null);
-		label_2L.setIcon(null);
-		label_3L.setIcon(null);
-		label_4L.setIcon(null);
+	@Override void afterCommand(char btn, int r) {
+		switch(btn) {
+		case 'o':
+			suggestion();
+			
+			break;
+		case 's':
+			if (status == 4)
+				status = 5;
+			
+			suggestion();
+			
+			break;
+		case 'c':
+			status = 0;
+			wintitle = null;
+			resetLabelIcons();
+			suggestion();
+			break;
+		case '1':
+		case '2':
+		case '4':
+			if (r == 0)
+				status = Character.getNumericValue(btn);
+			else
+				status = -1;
+
+			suggestion();
+			break;
+		case '3':
+			status = 3;
+			suggestion();
+			break;
+		
+		}
 	}
 	
 	public void suggestion()
@@ -481,6 +241,5 @@ public class CreateModelsGUI {
 		else
 			frame.setTitle("Create Models");
 	}
-
 }
 

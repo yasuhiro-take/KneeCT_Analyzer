@@ -1,6 +1,7 @@
 package imagejplugin.kneectanalyzer;
 
 import java.awt.EventQueue;
+import java.awt.Frame;
 
 import javax.swing.JFrame;
 
@@ -31,76 +32,32 @@ import ij.WindowManager;
 import imagejplugin.kneectanalyzer.IJIF;
 
 
-public class QuadrantAnalysisGUI {
-	private static boolean opened;
+public class QuadrantAnalysisGUI extends CommonGUI {
+	private static final String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results",
+		"3D Viewer", "Manual-set Quadrant System", "Measure ROI", "Snapshot", "2D", "3D" };
 	
+	private static final String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
 	
-	private JFrame frame;
-	private JButton btn_1, btn_2, btn_3, btn_4, btn_open, btn_save, btn_close;
 	private int status;
-	private JTextPane messageBox;
-	private ImageIcon arrowR, arrowD;
-	private JLabel label_open, label_save, label_close;
-	private JLabel label_1L, label_2L, label_3L, label_4L;
-	private JToggleButton tbtn1, tbtn2;
-	
-	private String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results" };
-	private String[] btntitles3D = { "3D Viewer", "Manual-set Quadrant System", "Measure ROI", "Snapshot" };
-	private static ImageIcon icons[];
-	private static String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
-	private static int mode2D3D = 1;
-	private static String basePathLast;
+	private String basePathLast;
 	
 	/**
 	 * Launch the application.
 	 */
-	public static void main(ImageIcon icons[], String[] args) {
-		QuadrantAnalysisGUI.icons = icons;
-		
-		main(args);
-	}
 	
-	public static void main(String[] args) {
-		if (opened) {
-			System.out.println("Quadrant System UI already exists.");
-			return;
-		}
-		
-		
-		EventQueue.invokeLater(new Runnable() {
-			public void run() {
-				try {
-					QuadrantAnalysisGUI window = new QuadrantAnalysisGUI();
-					window.frame.setVisible(true);
-					opened = true;
-					
-					java.awt.Window win = WindowManager.getWindow("Console");
-					if (win != null) 
-						win.setVisible(false);
-					
-
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		});
-	}
-
-	/**
-	 * Create the application.
-	 */
-	public QuadrantAnalysisGUI() {
+	public QuadrantAnalysisGUI(Frame instance) {
+		super(instance, btntitles);
 		status = 0;
 		basePathLast = null;
 		IJIF.initIJIF();
 		
-		initialize();
 		suggestion();
 	}
 
 	/**
 	 * Initialize the contents of the frame.
 	 */
+	/*
 	private void initialize() {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 350, 450);
@@ -220,17 +177,7 @@ public class QuadrantAnalysisGUI {
 		
 		frame.addWindowListener(new frameWindowListener());
 	}
-	
-	private void resetLabelIcons()
-	{
-		label_open.setIcon(null);
-		label_save.setIcon(null);
-		label_close.setIcon(null);
-		label_1L.setIcon(null);
-		label_2L.setIcon(null);
-		label_3L.setIcon(null);
-		label_4L.setIcon(null);
-	}
+	*/
 	
 	public void suggestion()
 	{
@@ -241,9 +188,18 @@ public class QuadrantAnalysisGUI {
 	{
 		resetLabelIcons();
 		
-		if (mode2D3D == 2) {
+		if (toggleSwitch == 2) {
 			suggestion3D(ret);
 			return;
+		}
+		
+		int qsystem = Quadrant.SysCoord.getDetermined();
+		int tuns = Quadrant.tunnelDetermined();
+		
+		if (status == 0 && IJIF.checkModels("FemOnly", "TibOnly") && qsystem != 0) {
+			status = 2;
+			if (qsystem == tuns)
+				status = 3;
 		}
 		
 		switch (status) {
@@ -251,7 +207,6 @@ public class QuadrantAnalysisGUI {
 			String msg;
 			if (IJIF.checkModels("FemOnly", "TibOnly")) {
 				if (IJIF.hasBoundaryData()) {
-					int qsystem = Quadrant.SysCoord.getDetermined();
 					msg = "Model data OK.\n";
 					msg += "Available Quadrant system: " + quadStatus[qsystem] + ".\n";
 					
@@ -272,7 +227,7 @@ public class QuadrantAnalysisGUI {
 					label_2L.setIcon(arrowR);
 				}
 			} else {
-				msg = "Open KCA-folder.";
+				msg = "Open KCA-folder.\n\n\n";
 				label_open.setIcon(arrowD);
 			}
 			messageBox.setText(msg);
@@ -282,7 +237,6 @@ public class QuadrantAnalysisGUI {
 		case 2:
 		 {
 			String msg = null;
-			int qsystem = Quadrant.SysCoord.getDetermined();
 			if (qsystem == 3) {
 				msg = "Quadrant coordinates were successfully determined. ";
 				msg += "You may want to proceed to *" + btntitles[2] + "*.";
@@ -308,7 +262,7 @@ public class QuadrantAnalysisGUI {
 			String msg = "Detected tunnel data are listed in Results window, with 2D and 3D images.\n";
 			msg += "You can save these data in KCA folder ";
 			msg += "(*floppy icon*).\n";
-			int tuns = Quadrant.tunnelDetermined();
+			
 			if (tuns < 3) {
 				int missft = 3 - tuns;
 				msg += "You can repeat *" + btntitles[2] +"* to detect " + quadStatus[missft] + " tunnels.";
@@ -359,12 +313,12 @@ public class QuadrantAnalysisGUI {
 			msg += "Determined Quadrant System: " + quadStatus[qsystem] + ".\n";
 		
 			if (IJIF3D.getVisibleFT() == 0) {
-				msg += "Create 3D model first (*" + btntitles3D[0] + "*).";
+				msg += "Create 3D model first (*" + btntitles[4] + "*).";
 				label_1L.setIcon(arrowR);
 			} else {
-				msg += "You can determine/edit quadrant system manually (*" +btntitles3D[1];
+				msg += "You can determine/edit quadrant system manually (*" +btntitles[5];
 				msg += "*).\n";
-				msg += "You can measure a tunnel center using ROI tool, followed by *" + btntitles3D[2];
+				msg += "You can measure a tunnel center using ROI tool, followed by *" + btntitles[6];
 				msg += "* to calculate its quadrant coord.";
 				
 				label_2L.setIcon(arrowR);
@@ -425,26 +379,7 @@ public class QuadrantAnalysisGUI {
 		frame.setTitle(title);
 	}
 	
-	
-	class btnActionListener implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			Object o = e.getSource();
-			char btn = ' ';
-			
-			if (o == btn_open) btn = 'o';
-			else if (o == btn_save) btn = 's';
-			else if (o == btn_close) btn = 'c';
-			else if (o == btn_1) btn = '1';
-			else if (o == btn_2) btn = '2';
-			else if (o == btn_3) btn = '3';
-			else if (o == btn_4) btn = '4';
-			
-			btnSwingWorker sw = new btnSwingWorker(btn);
-			sw.execute();
-		}
-	}
-	
+	/*
 	class togglebtnActionListener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
@@ -475,187 +410,81 @@ public class QuadrantAnalysisGUI {
 			suggestion(0);
 		}
 	}
+	*/
 	
-	class frameWindowListener implements WindowListener {
-		@Override
-		public void windowClosed(WindowEvent arg0) {
-			// TODO Auto-generated method stub
-			opened = false;
-		}
-		@Override public void windowActivated(WindowEvent arg0) {}
-		@Override public void windowClosing(WindowEvent arg0) {}
-		@Override public void windowDeactivated(WindowEvent arg0) {}
-		@Override public void windowDeiconified(WindowEvent arg0) {}
-		@Override public void windowIconified(WindowEvent arg0) {}
-		@Override public void windowOpened(WindowEvent arg0) {}
+	@Override int executeCommand(char btn) {
+		int r = -1;
+		switch(btn) {
+		case 'o':
+			r = IJIF.openKCADirectory("TibOnly", "FemOnly");
+			if (r > 0)
+				basePathLast = IJX.Util.getLastDirectory(IJIF.getBaseDirectory());
+			
+			break;
+		case 's':
+			r = IJIF.Quad.saveData(toggleSwitch);
+			break;
+		case 'c':
+			r = IJIF.closeWorkingFiles("Base", "TibOnly", "FemOnly", "LFCOnly", "FemoralQuadrant", 
+										"TibialQuadrant", "TunOnlyFem", "TunOnlyTib");
+			basePathLast = null;
+			
+			break;
+		case '1':
+			r = (toggleSwitch == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3dOne(true);
+			break;
+		case '2':
+			r = (toggleSwitch == 1) ? IJIF.Quad.determineSystem2D() : IJIF3D.Quad.determineSystem3D();
+			break;
+		case '3':
+			r = (toggleSwitch == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
+			break;
+		case '4':
+			r = (toggleSwitch == 1) ? IJIF.Quad.refreshResults() : IJIF3D.Quad.snapshot();
+			break;
+		} 
+		
+		return r;
 	}
 	
-	class btnSwingWorker extends IJIF_SwingWorker {
-		private char btn;
-		private String message;
-		
-		public btnSwingWorker(char btnType) 
-		{
-			btn = btnType;
-			message = "";
-			
-			frame.getGlassPane().addMouseListener(new MouseAdapter() {
-				public void mousePressed(MouseEvent e) {
-					e.consume();
-				}
-			});
-			frame.getGlassPane().setVisible(true);
-		}
-		
-		@Override
-		public Integer doInBackground() {
-			int r = -1;
-			IJIF.setCallback(this);
-			
-			switch(btn) {
+	@Override void afterCommand(char btn, int r) {
+		switch(btn) {
 			case 'o':
-				r = IJIF.openKCADirectory("TibOnly", "FemOnly");
-				if (r > 0)
-					basePathLast = IJX.Util.getLastDirectory(IJIF.getBaseDirectory());
+				suggestion();
 				
 				break;
 			case 's':
-				r = IJIF.Quad.saveData(mode2D3D);
+				if (status >= 3 && toggleSwitch == 1)
+					status = 5;
+				
+				suggestion();
+				
 				break;
 			case 'c':
-				r = IJIF.closeWorkingFiles("Base", "TibOnly", "FemOnly", "LFCOnly", "FemoralQuadrant", 
-											"TibialQuadrant", "TunOnlyFem", "TunOnlyTib");
-				basePathLast = null;
+				status = 0;
 				
+				resetLabelIcons();
+				suggestion();
 				break;
 			case '1':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3dOne(true);
-				break;
 			case '2':
-				r = (mode2D3D == 1) ? IJIF.Quad.determineSystem2D() : IJIF3D.Quad.determineSystem3D();
-				break;
 			case '3':
-				r = (mode2D3D == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
-				break;
 			case '4':
-				r = (mode2D3D == 1) ? IJIF.Quad.refreshResults() : IJIF3D.Quad.snapshot();
-				break;
-			} 
-			
-			return (Integer)(r);
-		}
-		
-		public void callback(String str) {
-			if (str == null)
-				message = "";
-			else {
-				message += str + "\n";
-				publish(message);
-			}
-		}
-		
-		@Override
-		protected void process(List<String> l) {
-			messageBox.setText(l.get(0));
-			frame.toFront();
-		}
-		
-		@Override
-		protected void done() {
-			Integer r;
-			
-			try {
-				r = get();
-			} catch (Exception ex) {
-				r = -1;
-				IJX.error(ex.toString(), 0);
-				ex.printStackTrace();
-			}
-			
-			IJIF.setCallback(null);
-			
-			switch(btn) {
-				case 'o':
-					suggestion();
-					
-					break;
-				case 's':
-					if (status >= 3 && mode2D3D == 1)
-						status = 5;
-					
-					suggestion();
-					
-					break;
-				case 'c':
-					status = 0;
-					
-					resetLabelIcons();
-					suggestion();
-					break;
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-					if (r == 0)
-						status = Character.getNumericValue(btn);
-					else
-						status = -1;
+				if (r == 0)
+					status = Character.getNumericValue(btn);
+				else
+					status = -1;
 
-					suggestion();
-					break;
-				
-			}
+				suggestion();
+				break;
 			
-			frame.getGlassPane().setVisible(false);
-            MouseListener[] listeners = frame.getGlassPane().getMouseListeners();
-            
-            for (MouseListener listener: listeners) {
-                frame.getGlassPane().removeMouseListener(listener);
-            }
-            
 		}
 	}
 	
-	
-	
-	
-
+	@Override void afterActionPerformed(ActionEvent e) {
+		Object o = e.getSource();
+		
+		if (o == tbtn1 || o == tbtn2)
+			suggestion(status = 0);
+	}
 }
-
-/*
-label_1L = new JLabel("");
-frame.getContentPane().add(label_1L, "2, 8, center, default");
-arrowR = icons[5];
-
-btn_1 = new JButton(btntitles[0]);
-frame.getContentPane().add(btn_1, "4, 8, 5, 1");
-btn_1.addActionListener(new btnActionListener());
-
-label_2L = new JLabel("");
-frame.getContentPane().add(label_2L, "2, 10");
-	
-btn_2 = new JButton(btntitles[1]);
-frame.getContentPane().add(btn_2, "4, 10, 5, 1");
-btn_2.addActionListener(new btnActionListener());
-
-label_3L = new JLabel("");
-frame.getContentPane().add(label_3L, "2, 12");
-
-btn_3 = new JButton(btntitles[2]);
-frame.getContentPane().add(btn_3, "4, 12, 5, 1");
-btn_3.addActionListener(new btnActionListener());
-
-label_4L = new JLabel("");
-frame.getContentPane().add(label_4L, "2, 14");
-
-btn_4 = new JButton(btntitles[3]);
-frame.getContentPane().add(btn_4, "4, 14, 5, 1");
-btn_4.addActionListener(new btnActionListener());
-
-JSeparator separator_1 = new JSeparator();
-frame.getContentPane().add(separator_1, "2, 16, 9, 1");
-
-messageBox = new JTextPane();
-messageBox.setEditable(false);
-frame.getContentPane().add(messageBox, "2, 18, 9, 1, fill, fill");
-*/
