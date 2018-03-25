@@ -2,13 +2,19 @@ package imagejplugin.kneectanalyzer;
 
 import java.awt.AWTEvent;
 import java.awt.Button;
+import java.awt.Checkbox;
+import java.awt.Color;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Label;
 import java.awt.Panel;
 import java.awt.PopupMenu;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
@@ -28,6 +34,8 @@ import ij.gui.MultiLineLabel;
 import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Overlay;
 import ij.gui.Roi;
+import ij.gui.TextRoi;
+import ij.gui.Toolbar;
 import ij.measure.Calibration;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
@@ -49,6 +57,7 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	private TextPanel tp;
 	private ImagePlus imp2D;
 	private Button btnDel, btnAdd;
+	private Checkbox cbox;
 	
 	private static final int FEM = Quadrant.FEM, TIB = Quadrant.TIB;  
 
@@ -75,9 +84,12 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		tunnelRois.toResults(analyzer, imp2D);
 		
 		r = startTunnelEditor(rt);
+		imp2D.killRoi();
 		if (r == 0) {
-			outputToResults(ft);
-			createTunnelModel(ft);
+			XY xy[] = outputToResults(ft);
+			if (cbox.getState())
+				createTunnelModel(ft);
+			finalizeTunnelApertures(imp2D, xy, ft);
 		} else {
 			clearTunnelApertures(imp2D);
 		}
@@ -247,8 +259,41 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		ql.toOverlay(overlay);
 		
 		overlay.setFillColor(Quadrant.tunnelColor);
+		overlay.setLabelColor(Quadrant.labelColor);
 		imp.setOverlay(overlay);
 		imp.updateAndDraw();
+	}
+	
+	private void finalizeTunnelApertures(ImagePlus imp, XY xy[], int ft) {
+		Overlay overlay = imp.getOverlay();
+		Font font = overlay.getLabelFont();
+		
+		//overlay.setFillColor(null);
+		overlay.drawLabels(false);
+		overlay.drawNames(false);
+		
+		Roi rois[] = Quadrant.getQuadrantTextRoi(overlay, ft);
+		
+		for (int i = 0; i < 3; i++) {
+			if (rois[i] != null) {
+				overlay.remove(rois[i]);
+				
+				Rectangle r = rois[i].getBounds();
+				TextRoi text = new TextRoi(r.x, r.y, rois[i].getName(), font);
+				text.setStrokeColor(Color.BLACK);
+				overlay.add(text);
+			}
+		}
+		
+		if (xy != null) {
+			for (int i = 0; i < xy.length; i++) {
+				Rectangle r = new Rectangle((int)xy[i].x - 1, (int)xy[i].y - 1, 3, 3);
+				Roi roi = new Roi(r);
+				roi.setStrokeColor(Color.BLACK); roi.setFillColor(Color.BLACK);
+				overlay.add(roi);
+			}
+		}
+		
 	}
 	
 	private int startTunnelEditor(ResultsTable rt) {
@@ -263,6 +308,9 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		imp2D.getWindow().toFront();
 		WindowManager.setCurrentWindow(imp2D.getWindow());
 		
+		IJ.setTool("ellip");
+		IJ.wait(50);
+		
 		NonBlockingGenericDialog gd = new NonBlockingGenericDialog("Tunnel Editor Dialog");
 		gd.addPanel(createPanel(tp, imp2D.getCanvas()));
 	    gd.showDialog();
@@ -271,7 +319,7 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	    return -1;
 	}
 	
-	private void outputToResults(int ft) {
+	private XY[] outputToResults(int ft) {
 		ResultsTable rt = tp.getResultsTable();
 		Calibration calBase = IJX.getBaseCalibration();
 		Calibration cal2D = imp2D.getCalibration();
@@ -280,35 +328,45 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		ResultsTable mainrt = Analyzer.getResultsTable();
     	clearResultsTable(mainrt, imp2D.getTitle()+":");
     	
-    	for (int i = 0; i < rt.size(); i++) {
-    		String label = rt.getLabel(i);
-			XY centroid = new XY(rt.getValue("X", i), rt.getValue("Y", i));
-			XY quad = Quadrant.calcCoord(ft, centroid);
-			
-			double z = 0;
-			if (label.matches(".*:[0-9]+")) {
-				int apID = IJX.Util.string2int(label, ":", 1);
-				QRoi qroi =  tunnelRois.findAperture(apID);
-				z = (qroi != null) ? qroi.z * scale : 0;
-			} else {
-				QRoi qroi = (tunnelRois != null) ? tunnelRois.findAperture(centroid, cal2D) : null;
-				z = (qroi != null) ? qroi.z * scale : 0;
-			}
-			
-			if (quad != null) {
-				mainrt.incrementCounter();
-				mainrt.addLabel(label);
-			
-				mainrt.addValue("Area",  rt.getValue("Area", i));
-				mainrt.addValue("X", centroid.x);
-				mainrt.addValue("Y", centroid.y);
-				mainrt.addValue("Z", z);
-				mainrt.addValue("QuadX", quad.x);
-				mainrt.addValue("QuadY", quad.y);
-			}
-		}
-
+    	XY retxy[];
+    	if (rt.size() > 0) {
+    		retxy = new XY[rt.size()];
+        	for (int i = 0; i < rt.size(); i++) {
+        		String label = rt.getLabel(i);
+    			XY centroid = retxy[i] = new XY(rt.getValue("X", i), rt.getValue("Y", i));
+    			XY quad = Quadrant.calcCoord(ft, centroid);
+    			
+    			double z = 0;
+    			if (label.matches(".*:[0-9]+")) {
+    				int apID = IJX.Util.string2int(label, ":", 1);
+    				QRoi qroi =  tunnelRois.findAperture(apID);
+    				z = (qroi != null) ? qroi.z * scale : 0;
+    			} else {
+    				QRoi qroi = (tunnelRois != null) ? tunnelRois.findAperture(centroid, cal2D) : null;
+    				z = (qroi != null) ? qroi.z * scale : 0;
+    			}
+    			
+    			if (quad != null) {
+    				mainrt.incrementCounter();
+    				mainrt.addLabel(label);
+    			
+    				mainrt.addValue("Area",  rt.getValue("Area", i));
+    				mainrt.addValue("X", centroid.x);
+    				mainrt.addValue("Y", centroid.y);
+    				mainrt.addValue("Z", z);
+    				mainrt.addValue("QuadX", quad.x);
+    				mainrt.addValue("QuadY", quad.y);
+    			}
+    			
+    			retxy[i].real2px(cal2D);
+    		}
+    	} else {
+    		retxy = null;
+    	}
+    	
     	mainrt.show("Results");
+    	
+    	return retxy;
 	}
 	
 	private void createTunnelModel(int ft) {
@@ -354,8 +412,16 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		btnDel.addActionListener(this);
 		btnAdd.addActionListener(this);
 		
+		pc.gridx = 0; pc.gridy = 3;
+		pc.gridwidth = 3;
+		pc.anchor = GridBagConstraints.WEST;
+		cbox = new Checkbox("Create Tunnel Model");
+		pgrid.setConstraints(cbox, pc);
+		cbox.setState(true);
+		panel.add(cbox);
+		
 		pc.gridx = 3; pc.gridy = 0;
-		pc.gridwidth = 1; pc.gridheight = 3;
+		pc.gridwidth = 1; pc.gridheight = 4;
 		pgrid.setConstraints(ic, pc);
 		panel.add(ic);
     	
@@ -464,8 +530,6 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		IJ.setThreshold(imp, 127, 128);
 		IJ.run(imp, "Make Binary", "method=Default background=Default");
 	}
-	
-	
 }
 
 class QRoiList {
@@ -605,7 +669,6 @@ class QRoiList {
 	
 	
 	public Overlay toOverlay(Overlay overlay) {
-		
 		overlay.drawLabels(true);
 		overlay.drawNames(true);
 		
