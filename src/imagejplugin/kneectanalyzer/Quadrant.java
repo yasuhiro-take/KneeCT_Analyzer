@@ -21,6 +21,7 @@ import ij.process.ImageStatistics;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -76,17 +77,16 @@ class Quadrant  {
 	static final String XYZSTR[] = new String[] { null, "YZ", "XY" }; 
 	private static final String FILENAME_FEMQ = "femQuad.points";
 	private static final String FILENAME_TIBQ = "tibQuad.points";
-	private static final String FILENAME_FEMTUN = "femTun.points";
-	private static final String FILENAME_TIBTUN = "tibTun.points";
 	private static final String FILENAME_RESULTS = "tunnelCoords.txt";
 	private static final String FILENAME_QSYSTEM = "QuadSysCoords.txt";
 	static final String COORDSTR_FEM[] = new String[] { "DS:100", "DS:0 HL:0", "HL:100"};
 	static final String COORDSTR_TIB[] = new String[] { "ML:0 AP:0", "ML:100", "AP:100"};
 	static final String COORDSTRS[][] = new String[][] { null, COORDSTR_FEM, COORDSTR_TIB };
 	private static Font coordFont = new Font(Font.SERIF, 0, 16);
-	static Color gridColor = new Color(0,255,0);
-	static Color textColor = new Color(255,0,0);
-	static Color tunnelColor = new Color(0,255,255);
+	static final Color gridColor = Color.GREEN; // new Color(0,255,0);
+	static final Color textColor = Color.RED; // new Color(255,0,0);
+	static final Color tunnelColor = Color.ORANGE; //new Color(0,255,255);
+	static final Color labelColor = Color.BLACK;
 	
 	static class SysCoord {
 		public static int getDetermined() {
@@ -211,17 +211,6 @@ class Quadrant  {
 		}
 	}
 	
-	/*
-	 * deprecated. use SysCoord.getDetermined()
-	public static int systemDetermined() {
-		int r = 0;
-		if (systemCoordFem != null) r |= FEM;
-		if (systemCoordTib != null) r |= TIB;
-			
-		return r;
-	}
-	*/
-	
 	public static int tunnelDetermined() {
 		int r = 0;
 		//if (tunnelRois[FEM] != null) r |= FEM;
@@ -241,6 +230,18 @@ class Quadrant  {
 			}
 		}
 		return r;
+	}
+	
+	public static Roi[] getQuadrantTextRoi(Overlay overlay, int ft) {
+		Roi rois[] = new Roi[3];
+		
+		for (int i = 0, j = 0; i < overlay.size(); i++) {
+			String name = overlay.get(i).getName();
+			if (name != null && IJX.Util.getIndexOf(COORDSTRS[ft], name) != -1)
+				rois[j++] = overlay.get(i);
+		}
+		
+		return rois;
 	}
 	
 	private static void draw(Overlay overlay, XY qxy[]) {
@@ -273,12 +274,22 @@ class Quadrant  {
 		draw(ol, qxy_px);
 		ol.setStrokeColor(gridColor);
 		
+		Font font = ol.getLabelFont();
 		int xoff[] = new int[] { -24, 0, -16 }; int yoff[] = new int [] { -14, -14, +4 };
 		for (int i = 0; i < 3; i++) {
-			TextRoi text = new TextRoi((int)qxy_px[i].x + xoff[i], (int)qxy_px[i].y + yoff[i], coordStr[i], coordFont);
-			text.setStrokeColor(textColor);
-			ol.add(text);
+			//TextRoi text = new TextRoi((int)qxy_px[i].x + xoff[i], (int)qxy_px[i].y + yoff[i], coordStr[i], coordFont);
+			TextRoi text = new TextRoi((int)qxy_px[i].x + xoff[i], (int)qxy_px[i].y + yoff[i], coordStr[i], font);
+			Rectangle r = text.getBounds();
+			Roi rectroi = new Roi(r);
+			//rectroi.setName(coordStr[i]);
+			//text.setStrokeColor(textColor);
+			ol.add(rectroi, coordStr[i]);
 		}
+		
+		ol.drawLabels(true);
+		ol.drawNames(true);
+		ol.setFillColor(tunnelColor);
+		ol.setLabelColor(labelColor);
 		
 		return ol;
 	}
