@@ -588,9 +588,9 @@ public class IJIF3D {
 				return -1;
 			
 			int cnt = 1;
-			while (IJX.Util.doesFileExist(basepath, fname + ".png") ||
+			while (IJX.Util.doesFileExist(basepath, fname + "-" + cnt + ".png") ||
 					WindowManager.getImage(fname) != null) {
-				fname += "-" + cnt++;
+				cnt++;
 			}
 			
 			IJX.rename(imp3D, fname);
