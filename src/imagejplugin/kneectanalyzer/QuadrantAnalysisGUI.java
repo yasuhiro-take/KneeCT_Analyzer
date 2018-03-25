@@ -33,10 +33,10 @@ import imagejplugin.kneectanalyzer.IJIF;
 
 
 public class QuadrantAnalysisGUI extends CommonGUI {
-	private static final String[] btntitles = { "Detect Quadrant System", "Manual-set Quadrant System", "Detect Tunnels", "Refresh Results",
-		"3D Viewer", "Manual-set Quadrant System", "Measure ROI", "Snapshot", "2D", "3D" };
+	private static final String[] btntitles = { "Detect Quadrant System", "Manual Quadrant System", "Detect Tunnels", "Refresh Results",
+		"3D Viewer", "Manual Quadrant System", "Measure ROI", "Snapshot", "2D", "3D" };
 	
-	private static final String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
+	static final String quadStatus[] = { "none", "fem", "tib", "fem&tib" };
 	
 	private int status;
 	private String basePathLast;
@@ -54,131 +54,6 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 		suggestion();
 	}
 
-	/**
-	 * Initialize the contents of the frame.
-	 */
-	/*
-	private void initialize() {
-		frame = new JFrame();
-		frame.setBounds(100, 100, 350, 450);
-		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		frame.getContentPane().setLayout(new FormLayout(new ColumnSpec[] {
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,
-				FormFactory.RELATED_GAP_COLSPEC,
-				ColumnSpec.decode("max(56dlu;default):grow"),
-				FormFactory.RELATED_GAP_COLSPEC,
-				FormFactory.DEFAULT_COLSPEC,},
-			new RowSpec[] {
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				FormFactory.DEFAULT_ROWSPEC,
-				FormFactory.RELATED_GAP_ROWSPEC,
-				RowSpec.decode("default:grow"),})); 
-		
-		label_open = new JLabel("");	
-		frame.getContentPane().add(label_open, "2, 2, center, default");
-		arrowD = icons[4];
-		
-		label_save = new JLabel("");
-		frame.getContentPane().add(label_save, "4, 2, center, default");
-		
-		label_close = new JLabel("");
-		frame.getContentPane().add(label_close, "6, 2, center, default");
-		
-		btn_open = new JButton("");
-		btn_open.setIcon(icons[0]);
-		frame.getContentPane().add(btn_open, "2, 4");
-		btn_open.addActionListener(new btnActionListener());
-		
-		btn_save = new JButton("");
-		btn_save.setIcon(icons[1]);
-		frame.getContentPane().add(btn_save, "4, 4");
-		btn_save.addActionListener(new btnActionListener());
-		
-		btn_close = new JButton("");		
-		btn_close.setIcon(icons[2]);
-		frame.getContentPane().add(btn_close, "6, 4");
-		btn_close.addActionListener(new btnActionListener());
-		
-		JButton button_q = new JButton("");
-		button_q.setIcon(icons[3]);
-		frame.getContentPane().add(button_q, "10, 4");
-		
-		JSeparator separator = new JSeparator();
-		frame.getContentPane().add(separator, "2, 6, 9, 1");
-		
-		tbtn1 = new JToggleButton("2D");tbtn1.setSelected(true);
-		frame.getContentPane().add(tbtn1, "2, 8, 6, 1");
-		tbtn1.addActionListener(new togglebtnActionListener());
-		tbtn2 = new JToggleButton("3D");tbtn2.setSelected(false);
-		frame.getContentPane().add(tbtn2, "8, 8, 3, 1");
-		tbtn2.addActionListener(new togglebtnActionListener());
-		mode2D3D = 1;
-		if (!IJIF.has3D())
-			tbtn2.setEnabled(false);
-		
-		
-		label_1L = new JLabel("");
-		frame.getContentPane().add(label_1L, "2, 10");
-		arrowR = icons[5];
-		
-		btn_1 = new JButton(btntitles[0]);
-		frame.getContentPane().add(btn_1, "4, 10, 5, 1");
-		btn_1.addActionListener(new btnActionListener());
-		
-		label_2L = new JLabel("");
-		frame.getContentPane().add(label_2L, "2, 12");
-			
-		btn_2 = new JButton(btntitles[1]);
-		frame.getContentPane().add(btn_2, "4, 12, 5, 1");
-		btn_2.addActionListener(new btnActionListener());
-		
-		label_3L = new JLabel("");
-		frame.getContentPane().add(label_3L, "2, 14");
-		
-		btn_3 = new JButton(btntitles[2]);
-		frame.getContentPane().add(btn_3, "4, 14, 5, 1");
-		btn_3.addActionListener(new btnActionListener());
-		
-		label_4L = new JLabel("");
-		frame.getContentPane().add(label_4L, "2, 16");
-		
-		btn_4 = new JButton(btntitles[3]);
-		frame.getContentPane().add(btn_4, "4, 16, 5, 1");
-		btn_4.addActionListener(new btnActionListener());
-		//if (mode2D3D == 1) 	btn_4.setEnabled(false);
-		
-		JSeparator separator_1 = new JSeparator();
-		frame.getContentPane().add(separator_1, "2, 18, 9, 1");
-		
-		messageBox = new JTextPane();
-		messageBox.setEditable(false);
-		frame.getContentPane().add(messageBox, "2, 20, 9, 1, fill, fill");
-		
-		frame.addWindowListener(new frameWindowListener());
-	}
-	*/
-	
 	public void suggestion()
 	{
 		this.suggestion(0);
@@ -379,39 +254,7 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 		frame.setTitle(title);
 	}
 	
-	/*
-	class togglebtnActionListener implements ActionListener {
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			Object o = e.getSource();
-			
-			if (o == tbtn1 && mode2D3D == 2) {
-				mode2D3D = 1;
-				btn_1.setText(btntitles[0]);
-				btn_2.setText(btntitles[1]);
-				btn_3.setText(btntitles[2]);
-				btn_4.setText(btntitles[3]);
-				//btn_4.setEnabled(false);
-				tbtn1.setSelected(true);
-				tbtn2.setSelected(false);
-				status = (status >= 3) ? 3 : 0;
-			} else if (o == tbtn2 && mode2D3D == 1) {
-				mode2D3D = 2;
-				btn_1.setText(btntitles3D[0]);
-				btn_2.setText(btntitles3D[1]);
-				btn_3.setText(btntitles3D[2]);
-				btn_4.setText(btntitles3D[3]);
-				//btn_4.setEnabled(true);
-				tbtn1.setSelected(false);
-				tbtn2.setSelected(true);
-				status = (status >= 3) ? 3 : 0;
-			}
-			
-			suggestion(0);
-		}
-	}
-	*/
-	
+
 	@Override int executeCommand(char btn) {
 		int r = -1;
 		switch(btn) {
