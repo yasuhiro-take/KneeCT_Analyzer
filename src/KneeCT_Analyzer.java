@@ -6,7 +6,8 @@ import javax.swing.ImageIcon;
 
 import imagejplugin.kneectanalyzer.CommonGUI;
 import imagejplugin.kneectanalyzer.CreateModelsGUI;
-import imagejplugin.kneectanalyzer.QuadrantAnalysisGUI; 
+import imagejplugin.kneectanalyzer.QuadrantAnalysisGUI;
+import imagejplugin.kneectanalyzer.VirtualGraftingGUI;
 import ij.IJ;
 import ij.WindowManager;
 import ij.plugin.PlugIn;
@@ -16,7 +17,7 @@ public class KneeCT_Analyzer extends PlugInFrame {
 	private static ImageIcon icons[];
 	private static KneeCT_Analyzer instance;
 	private int wintype;
-	private static final int MODEL=1, QUAD=2;
+	private static final int MODEL=1, QUAD=2, GRAFT=3;
 	
 	public KneeCT_Analyzer() {
 		super(null);
@@ -40,6 +41,7 @@ public class KneeCT_Analyzer extends PlugInFrame {
 		switch (arg) {
 		case "Model": cmd = MODEL; break;
 		case "Quadrant": cmd = QUAD; break;
+		case "Graft": cmd = GRAFT; break;
 		default: return;
 		}
 		
@@ -56,7 +58,8 @@ public class KneeCT_Analyzer extends PlugInFrame {
 		
 		switch (cmd) {
 		case MODEL: new CreateModelsGUI(instance); break;
-		case QUAD: new QuadrantAnalysisGUI(instance); break; 
+		case QUAD: new QuadrantAnalysisGUI(instance); break;
+		case GRAFT: new VirtualGraftingGUI(instance); break;
 		}
 		
 		EventQueue.invokeLater(new Runnable() {
