@@ -44,10 +44,11 @@ public class IJIF implements Measurements {
 	private static String nonKCAtitle;
 	
 	//private static final String FILENAME_FEC = "fec.points";
-	private static final String FILENAME_BOUNDARY = "boundary.txt";
+	private static final String FILENAME_BOUNDARY = "boundary.txt"; 
 	
 	private static final String MD_THRESHOLD = "Threshold";
 	public static final String WINTITLE_BOUNDARY = AnatomyDetector.WINTITLE_BOUNDARY;
+	
 	
 	private static final String BD_TYPE[] = BoundaryData.TYPESTRING;
 	
@@ -63,21 +64,14 @@ public class IJIF implements Measurements {
 		initializedFlag = true;
 		minThreshold = maxThreshold = 0;
 		
-		try {
-			ij3d = (Class.forName("ij3d.Image3DUniverse") != null);			
-		} catch (ClassNotFoundException e) {
-			ij3d = false;
-		} catch (NoClassDefFoundError e) {
-			ij3d = false;
-		} finally {
-			System.out.println("3D Viewer available? "+ij3d);
-		}
-		
+		ij3d = IJX.Util.checkClass("ij3d.Image3DUniverse");	
 	}
 	
 	/*    -------------------------------------------------------------  
 	 *    ----------------------     METHODS     ---------------------- 
 	 */
+	
+	
 	
 	public static boolean has3D() {
 		return ij3d;
@@ -85,6 +79,26 @@ public class IJIF implements Measurements {
 	
 	public static boolean hasBoundaryData() {
 		return (IJX.getResultsTable(WINTITLE_BOUNDARY) != null);
+	}
+	
+	public static boolean hasTunnelCoords() {
+		boolean ret = false;
+		ResultsTable rt;
+		if ((rt = IJX.getResultsTable("Results")) != null) {
+			if (rt.getColumnIndex("QuadX") != ResultsTable.COLUMN_NOT_FOUND)
+				ret = true;
+		}
+		if ((rt = IJX.getResultsTable("Results3D")) != null) {
+			if (rt.getColumnIndex("QuadX") != ResultsTable.COLUMN_NOT_FOUND)
+				ret = true;
+		}
+		
+		return ret;
+	}
+	
+	public static boolean hasGrafts() {
+		String wins[] = IJX.getWindowTitles("Graft-.*");
+		return (wins != null);
 	}
 	
 	public static boolean checkModels(String... models) {
@@ -97,6 +111,7 @@ public class IJIF implements Measurements {
 		
 		return ret;
 	}
+	
 	
 	public static boolean isStack() {
 		// check and return how many stack image open
@@ -127,6 +142,12 @@ public class IJIF implements Measurements {
 		}
 		
 		return false;
+	}
+	
+	public static boolean isKCADirectory(String dir) {
+		return (IJX.Util.doesFileExist(dir, "Base.avi") && 
+			(IJX.Util.doesFileExist(dir, "Voxel.txt") || IJX.Util.doesFileExist(dir, "metadata.txt")));
+			
 	}
 	
 	public static void setCallback(IJIF_SwingWorker sw) {
@@ -225,8 +246,7 @@ public class IJIF implements Measurements {
 		if (dir == null)
 			return -1;
 		
-		if (IJX.Util.doesFileExist(dir, "Base.avi") && 
-			(IJX.Util.doesFileExist(dir, "Voxel.txt") || IJX.Util.doesFileExist(dir, "metadata.txt"))) {
+		if (isKCADirectory(dir)) {
 			int ret = 0;
 			
 			notice("Opening Base...");
@@ -298,8 +318,13 @@ public class IJIF implements Measurements {
 	}
 	
 	public static int closeWorkingFiles(String... wintitles) {
-		for (String win: wintitles) 
-			IJX.forceClose(win);
+		for (String win: wintitles) {
+			if (win.endsWith(".*")) {
+				String wins[] = IJX.getWindowTitles(win);
+				IJX.forceClose(wins);
+			} else
+				IJX.forceClose(win);
+		}
 		
 		String workwins[] = IJX.getWindowTitles("KCAwork-.*");
 		if (workwins != null)
@@ -513,7 +538,7 @@ public class IJIF implements Measurements {
 			if (ij3d)
 				IJIF3D.Quad.save(basepath);
 			
-			//IJIF.Modeler.save("TunOnlyFem", "TunOnlyTib");
+			IJIF.Modeler.save("TunOnlyFem", "TunOnlyTib");
 			
 			return 0;
 		}
@@ -539,9 +564,8 @@ public class IJIF implements Measurements {
 			return 0;
 		}
 		
-		public static int detectTunnel2D() {
-			(new TunnelDetector()).run(null);
-			return 0;
+		public static String detectTunnel2D() {
+			return (new TunnelDetector()).directrun();
 		}
 		
 		public static int determineSystem2D() {
@@ -555,6 +579,83 @@ public class IJIF implements Measurements {
 		}
 		
 		
+	}
+	
+	static class Grafter {
+		public static int open(String... wins) {
+			int r = openKCADirectory(wins);
+			if (r > 0) {
+				String dir = getBaseDirectory();
+				
+				if (IJX.Util.doesFileExist(dir, Quadrant.FILENAME_RESULTS) ||
+					IJX.Util.doesFileExist(dir, Quadrant.FILENAME_RESULTS3D))
+					importData(dir);
+			}
+			
+			return r;
+		}
+		public static int save() {
+			String basepath = getBaseDirectory();
+			if (basepath == null)
+				return -1;
+			
+			String snapshots[] = IJX.getWindowTitles("3D-.*");
+			
+			if (snapshots != null)
+				for (String win: snapshots)
+					IJX.savePNG(WindowManager.getImage(win), basepath, win);
+			
+			String grafts[] = IJX.getWindowTitles("Graft-.*");
+			if (grafts != null)
+				IJIF.Modeler.save(grafts);
+			
+			return 0;
+		}
+		
+		public static int importData() {
+			String dir = openDirectoryDialog("Select directory");
+			
+			int r  = importData(dir);
+			
+			if (r == -1)
+				IJX.error("File not found: " + Quadrant.FILENAME_RESULTS); 
+			
+			return r;
+		}
+		
+		public static int importData(String dir) {
+			if (dir == null || !isKCADirectory(dir))
+				return -1;
+			
+			String f1 = Quadrant.FILENAME_RESULTS, f2 = Quadrant.FILENAME_RESULTS3D;
+			boolean loaded = false;
+			if (IJX.Util.doesFileExist(dir, f1)) {
+				IJX.closeResultsTable("Results");
+				ResultsTable rt = ResultsTable.open2(IJX.Util.createPath(dir, f1));
+				if (rt != null) {
+					rt.show("Results");
+					loaded = true;
+				}
+			}
+			
+			if (IJX.Util.doesFileExist(dir, f2)) {
+				IJX.closeResultsTable("Results3D");
+				ResultsTable rt = ResultsTable.open2(IJX.Util.createPath(dir, f2));
+				if (rt != null) {
+					rt.show("Results3D");
+					loaded = true;
+				}
+			}
+			
+			if (!loaded) return -1;
+			
+			return 0;
+		}
+		
+		public static int createGraft() {
+			int r = (new QuadrantGrafter()).directrun(null);
+			return r;
+		}
 	}
 }
 
