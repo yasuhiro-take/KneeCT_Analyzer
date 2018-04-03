@@ -82,6 +82,14 @@ class IJX {
 			IJX.forceClose(imp);
 	}
 	
+	public static void forceClose(String wins[]) {
+		ImagePlus imp;
+		for (String wintitle: wins) {
+			if ((imp = WindowManager.getImage(wintitle)) != null)
+				IJX.forceClose(imp);
+		}
+	}
+	
 	public static void rename(ImagePlus imp, String name) {
 		int IDs[] = WindowManager.getIDList();
 		
@@ -460,6 +468,37 @@ class IJX {
 	}
 	
 	static class Util {
+		static boolean checkClass(String c) {
+			boolean ret = false;
+			try {
+				ret = (Class.forName(c) != null);			
+			} catch (ClassNotFoundException e) {
+				ret = false;
+			} catch (NoClassDefFoundError e) {
+				ret = false;
+			} finally {
+				System.out.println("Checking class "+ c + ":" + ret);
+			}
+			
+			return ret;
+		}
+		
+		static Object[] concatArray(String obj1[], String obj2[]) {
+			int l1 = (obj1 != null) ? obj1.length : 0;
+			int l2 = (obj2 != null) ? obj2.length : 0;
+			
+			if (l1 + l2 == 0) return null;
+			
+			String ret[] = new String[l1 + l2];
+			for (int i = 0; i < l1 + l2; i++) {
+				if (i < l1)
+					ret[i] = obj1[i];
+				else
+					ret[i] = obj2[i - l1];
+ 			}
+			
+			return ret;
+		}
 		
 		static XY rotateXY(XY xy, XY center, double angle) {
 			double xc = center.x;
