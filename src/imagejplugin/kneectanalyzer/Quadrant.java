@@ -3,27 +3,18 @@ package imagejplugin.kneectanalyzer;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.WindowManager;
-import ij.gui.ImageCanvas;
 import ij.gui.Line;
 import ij.gui.Overlay;
 import ij.gui.Roi;
 import ij.gui.RotatedRectRoi;
 import ij.gui.TextRoi;
 import ij.measure.Calibration;
-import ij.measure.CurveFitter;
 import ij.measure.ResultsTable;
 import ij.plugin.filter.Analyzer;
-import ij.plugin.filter.ParticleAnalyzer;
-import ij.process.ByteProcessor;
-import ij.process.ColorProcessor;
-import ij.process.ImageProcessor;
-import ij.process.ImageStatistics;
 
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Rectangle;
-import java.util.ArrayList;
-import java.util.Arrays;
 
 
 class QRoi {
@@ -77,7 +68,8 @@ class Quadrant  {
 	static final String XYZSTR[] = new String[] { null, "YZ", "XY" }; 
 	private static final String FILENAME_FEMQ = "femQuad.points";
 	private static final String FILENAME_TIBQ = "tibQuad.points";
-	private static final String FILENAME_RESULTS = "tunnelCoords.txt";
+	public static final String FILENAME_RESULTS = "tunnelCoords.txt";
+	public static final String FILENAME_RESULTS3D = "tunnelCoords3D.txt";
 	private static final String FILENAME_QSYSTEM = "QuadSysCoords.txt";
 	static final String COORDSTR_FEM[] = new String[] { "DS:100", "DS:0 HL:0", "HL:100"};
 	static final String COORDSTR_TIB[] = new String[] { "ML:0 AP:0", "ML:100", "AP:100"};
@@ -301,6 +293,12 @@ class Quadrant  {
 		imp.updateAndDraw();
 	}
 	
+	/**
+	 * calcCoord - calculate quadrant coordinate of a specified point (xy) in a specified quadrant system (qxy) 
+	 * @param xy
+	 * @param qxy
+	 * @return
+	 */
 	private static XY calcCoord(XY xy, XY qxy[]) {
 		XY ret = new XY();
 		
@@ -327,6 +325,17 @@ class Quadrant  {
 		return null;
 	}
 	
+	public static XY calc2DPoint(int ft, XY xy) {
+		XY qxy[] = Quadrant.SysCoord.get(ft);
+		XY pnt2D = qxy[0].clone();
+		XY vDS = XY.sub(qxy[1], qxy[0]);
+		XY vHL = XY.sub(qxy[2], qxy[0]);
+		vDS.multiply((ft == Quadrant.FEM) ? 1 - xy.x : xy.x); 
+		vHL.multiply(xy.y);
+		pnt2D.add(vDS); pnt2D.add(vHL);
+		
+		return pnt2D;
+	}
 	
 	private static ImagePlus create2DImageFem() {
 		int nrx = RTBoundary.getSplitX();
