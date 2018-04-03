@@ -53,12 +53,25 @@ public class XY extends Object {
 		xy.real2px(cal);
 		return xy;
 	}
+	public XY clonePixelized(double w, double h) {
+		XY xy = new XY(this);
+		xy.real2px(w, h);
+		return xy;
+	}
+	
 	public XY cloneRealized(Calibration cal) {
 		XY xy = new XY(this);
 		xy.px2real(cal);
 		return xy;
 	}
 	
+	public void add(XY xy) {
+		x += xy.x; y += xy.y;
+	}
+	
+	public void multiply(double scale) {
+		x *= scale; y *= scale;
+	}
 	
 	public static XY midstOf(XY xy1, XY xy2) {
 		XY m = new XY((xy1.x + xy2.x) / 2, (xy1.y + xy2.y) / 2);
