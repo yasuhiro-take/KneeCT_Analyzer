@@ -2,19 +2,20 @@ package imagejplugin.kneectanalyzer;
 
 import java.awt.Button;
 import java.awt.Canvas;
+import java.awt.Checkbox;
+import java.awt.Choice;
+import java.awt.Color;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Label;
 import java.awt.Panel;
 import java.awt.Scrollbar;
+import java.awt.TextField;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Vector;
-
-
-
-
 
 
 //import javax.vecmath.Color3f;
@@ -34,6 +35,7 @@ import ij.gui.MultiLineLabel;
 import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Roi;
 import ij.gui.Toolbar;
+import ij.measure.Calibration;
 import ij.measure.ResultsTable;
 import ij.plugin.ImageCalculator;
 import ij.plugin.filter.Analyzer;
@@ -47,13 +49,13 @@ import ij3d.behaviors.InteractiveBehavior;
 import ij3d.behaviors.Picker;
 
 public class IJIF3D {
+	private static final int FEM = 1, TIB = 2;
+	private static final int IJ3D_WINSIZE = 512;
+
 	public static Image3DUniverse univ;
 	//public static ArrayList<String> contentNames;
 	private static ResultsTable rt3d;
-	private static final int IJ3D_WINSIZE = 512;
 	private static int Resampling = 0; 
-	
-	private static float transparency;
 	
 	public static Image3DUniverse open3D() {
 		if (IJIF.ij3d == true && univ == null) {
@@ -255,42 +257,80 @@ public class IJIF3D {
 		return null;
 	}
 	
+	public static String[] getContentNames(String regex, boolean onlyVisible) {
+		if (univ == null) return null;
+		
+		
+		Collection<Content> clist = univ.getContents();
+		ArrayList<String> ret = new ArrayList();
+		
+		for (Content c: clist)
+			if (!onlyVisible || c.isVisible())
+				if (regex == null || c.getName().matches(regex))
+					ret.add(c.getName());
+		
+		return ret.toArray(new String[0]);
+	}
+	
+	
 	static class Dialog {
 		private static final String WINTITLES_BONE[] = { "FemOnly", "LFCOnly", "TibOnly" };
-		private static final int BONEINDEX2FT[] = { 1, 1, 2 };
-		private static final String WINTITLES_TUNNEL[] = { "TunOnlyFem", "TunOnlyTib", "TunOnlyBoth" };
 		
-		private static final int FEMONLY=1, LFCONLY=2, TIBONLY=4, TUNONLYFEM=8,TUNONLYTIB=16;
-		private static final int FLAGS[] = { FEMONLY, LFCONLY, TIBONLY, TUNONLYFEM, TUNONLYTIB };
-		private static int FEM = 1, TIB = 2; 
+		private static final int FEMONLY=1, LFCONLY=2, TIBONLY=4, TUNONLYFEM=8,TUNONLYTIB=16, GRAFTS=32;
+		private static final int FLAGS[] = { FEMONLY, LFCONLY, TIBONLY, TUNONLYFEM, TUNONLYTIB, GRAFTS };
+		  
+		private static final int MISC_TUNNELS = 1, MISC_GRAFTS = 2;
 		
-		private static boolean addMisc(GenericDialog gd, boolean enableTunnel) {
-			gd.addSlider("Transparency", 0, 100, 0);
-			
-			boolean hasTun = (Quadrant.tunnelDetermined() != 0 && enableTunnel);
-			if (hasTun) {
-				boolean tun3D = ((content2flag(true) & (TUNONLYFEM|TUNONLYTIB)) != 0);
-				gd.addCheckbox("Add Tunnel(s)", tun3D);
-			}
-			
-			//TODO: grafts...
-			
-			return hasTun;
-		}
-		
-		private static int getMisc(GenericDialog gd, boolean hasTun, int ftNew) {
-			Vector<Scrollbar> slider = gd.getSliders();
-			//transparency = slider.get(0).getValue();
-			transparency = (float)gd.getNextNumber();
+		private static int addMisc(GenericDialog gd, boolean enableTunnel, boolean enableGraft) {
+			//gd.addSlider("Transparency", 0, 100, 0);
 			
 			int ret = 0;
-			if (hasTun)
+			String items[] = new String[2];
+			boolean defaults[] = new boolean[2];
+			int i = 0;
+			
+			if (Quadrant.tunnelDetermined() != 0 && enableTunnel) {
+				boolean tun3D = ((content2flag(true) & (TUNONLYFEM|TUNONLYTIB)) != 0);
+				items[i] = "Add Tunnel(s)";
+				defaults[i++] = tun3D;
+				//gd.addCheckbox("Add Tunnel(s)", tun3D);
+				ret |= MISC_TUNNELS;
+			}
+			
+			String grafts[] = IJX.getWindowTitles("Graft-.*");
+			if (grafts != null && enableGraft) {
+				boolean graft3D = ((content2flag(true) & GRAFTS) != 0);
+				items[i] = "Add Graft(s)";
+				defaults[i++] = graft3D;
+				//gd.addCheckbox("Add Graft(s)", graft3D);
+				ret |= MISC_GRAFTS;
+			}
+			
+			if (i > 0) {
+				String labels[] = new String[] { "Other components" };
+				gd.addCheckboxGroup(i, 1, items, defaults, labels);
+			}
+			
+			return ret;
+		}
+		
+		private static int getMisc(GenericDialog gd, int miscFlag, int ftNew) {
+			//Vector<Scrollbar> slider = gd.getSliders();
+			//transparency = slider.get(0).getValue();
+			//transparency = (float)gd.getNextNumber();
+			
+			int ret = 0;
+			if ((miscFlag & MISC_TUNNELS) != 0)
 				if (gd.getNextBoolean())
 					switch (ftNew) {
 					case 1: ret = TUNONLYFEM; break;
 					case 2: ret = TUNONLYTIB; break;
 					case 3: ret = TUNONLYFEM | TUNONLYTIB; break;
 					}
+			
+			if ((miscFlag & MISC_GRAFTS) != 0)
+				if (gd.getNextBoolean())
+					ret |= GRAFTS;
 			
 			return ret;
 		}
@@ -305,8 +345,8 @@ public class IJIF3D {
 			gd.addMessage(msg);
 			
 			String bonetitles[] = new String[] { WINTITLES_BONE[1], WINTITLES_BONE[2] };
-			gd.addRadioButtonGroup("Bone model to show", bonetitles, 2, 1, bonetitles[ft - 1]);
-			boolean hasTun = addMisc(gd, enableTunnel);
+			gd.addRadioButtonGroup("Bony component", bonetitles, 2, 1, bonetitles[ft - 1]);
+			int miscFlag = addMisc(gd, enableTunnel, false);
 			
 			gd.showDialog();
 			if (!gd.wasOKed()) return 0;
@@ -316,7 +356,7 @@ public class IJIF3D {
 			ftNew = (ftStr == bonetitles[0]) ? FEM : TIB;
 			flag = FLAGS[ftNew];
 			
-			flag |= getMisc(gd, hasTun, ftNew);
+			flag |= getMisc(gd, miscFlag, ftNew);
 			
 			return flag;
 		}
@@ -336,28 +376,45 @@ public class IJIF3D {
 			defaults[1] = ((contentFlag & LFCONLY) != 0) ? true : false;
 			defaults[2] = ((contentFlag & TIBONLY) != 0) ? true : false;
 			
-			String labels[] = new String[] { "Bone model to show" };
+			String labels[] = new String[] { "Bony components" };
 			gd.addCheckboxGroup(WINTITLES_BONE.length, 1, WINTITLES_BONE, defaults, labels);
 			
-			boolean hasTun = addMisc(gd, true);
+			int miscFlag = addMisc(gd, true, true);
 			
 			gd.showDialog();
 			if (!gd.wasOKed()) return 0;
 			
-			int ftNew = 0, flag = 0; 
+			int flag = 0; 
 			for (int i = 0; i < WINTITLES_BONE.length; i++)
-				if (gd.getNextBoolean()) {
+				if (gd.getNextBoolean())
 					flag |= FLAGS[i];
-					ftNew |= BONEINDEX2FT[i];
-				}
 			
-			flag |= getMisc(gd, hasTun, ftNew);
+			int ftNew = flag2ft(flag);
+			
+			flag |= getMisc(gd, miscFlag, ftNew);
 			
 			return flag;
 		}
 		
+		static int flag2tunnels(int flag) {
+			int cnt = 0;
+			if ((flag & TUNONLYFEM) != 0) cnt++;
+			if ((flag & TUNONLYTIB) != 0) cnt++;
+			
+			return cnt;
+		}
+		
 		static ImagePlus[] flag2imp(int flag) {
-			ImagePlus[] imp = new ImagePlus[3]; // 0..fem, 1..tib, 2..tun; 3..grafts...
+			int cnt = flag2tunnels(flag);
+			
+			String graftWins[] = null;
+			if ((flag & GRAFTS) != 0) {
+				graftWins = IJX.getWindowTitles("Graft-.*");
+				if (graftWins != null)
+					cnt += graftWins.length;
+			}
+			
+			ImagePlus[] imp = new ImagePlus[2+cnt]; // 0..fem, 1..tib, 2..tun & grafts...
 			
 			if ((flag & LFCONLY) != 0) {
 				if ((imp[0] = WindowManager.getImage("LFCOnly")) == null) {
@@ -373,19 +430,14 @@ public class IJIF3D {
 					return null;
 			}
 			
-			ImagePlus tunFem, tunTib; tunFem = tunTib = null;
+			int n = 2;
 			if ((flag & TUNONLYFEM) != 0)
-				imp[2] = tunFem = WindowManager.getImage("TunOnlyFem");
+				imp[n++] = WindowManager.getImage("TunOnlyFem");
 			if ((flag & TUNONLYTIB) != 0)
-				imp[2] = tunTib = WindowManager.getImage("TunOnlyTib");
-			if (tunFem != null && tunTib != null) {
-				if ((imp[2] = WindowManager.getImage("TunOnlyBoth")) == null) {
-					ImageCalculator ic = new ImageCalculator();
-				
-					imp[2] = ic.run("OR create stack", tunFem, tunTib);
-					IJX.rename(imp[2], "TunOnlyBoth");
-				}
-			}
+				imp[n++] = WindowManager.getImage("TunOnlyTib");
+			if ((flag & GRAFTS) != 0)
+				for (String win: graftWins)
+					imp[n++] = WindowManager.getImage(win);
 			
 			return imp;
 		}
@@ -403,18 +455,36 @@ public class IJIF3D {
 			if ((flag & FEMONLY) != 0) ret += "Fem";
 			if ((flag & LFCONLY) != 0) ret += "LFC";
 			if ((flag & TIBONLY) != 0) ret += "Tib";
-			if ((flag & (TUNONLYFEM | TUNONLYTIB)) != 0)
-				ret += "+Tun";
+			if ((flag & (TUNONLYFEM | TUNONLYTIB)) != 0) ret += "+Tun";
+			if ((flag & GRAFTS) != 0) ret += "+Graft";
 			
 			return ret;
 		}
 		
 		public static int content2flag(boolean onlyVisible) {
 			int ret = 0;
-			Content c;
+			//Content c;
 			
 			if (univ == null) return 0;
 			
+			String names[] = getContentNames(null, onlyVisible);
+			for (String name: names) {
+				int flag = 0;
+				switch (name) {
+				case "FemOnly": flag = FEMONLY; break;
+				case "LFCOnly": flag = LFCONLY; break;
+				case "TibOnly": flag = TIBONLY; break;
+				case "TunOnlyFem": flag = TUNONLYFEM; break;
+				case "TunOnlyTib": flag = TUNONLYTIB; break;
+				}
+				
+				if (flag == 0 && name.matches("Graft-.*"))
+					flag = GRAFTS;
+				 
+				ret |= flag;
+			}
+			
+			/*
 			if ((c = univ.getContent("FemOnly")) != null)
 				if (!onlyVisible || c.isVisible()) ret |= FEMONLY;
 			if ((c = univ.getContent("LFCOnly")) != null)
@@ -425,32 +495,31 @@ public class IJIF3D {
 				if (!onlyVisible || c.isVisible()) ret |= TUNONLYFEM;
 			if ((c = univ.getContent("TunOnlyTib")) != null)
 				if (!onlyVisible || c.isVisible()) ret |= TUNONLYTIB;
+				*/
 			
 			return ret;
 		}
 	}
 	
 	static class Quad {
-		private static final String FILENAME_RESULTS3D = "tunnelCoords3D.txt";
-		
 		public static int view3dOne(boolean enableTunnel) {
 			if (open3D() == null)
 				return IJX.error("3D Viewer not available.", -1);
 			
 			hideAllContents();
-			int showFlag = Dialog.oneBone("Choice", "Select below for 3D model to create.", enableTunnel);
-			if (showFlag == 0) return 0;
+			int showFlag = Dialog.oneBone("Choice", "Select below for 3D model to show.", enableTunnel);
+			if (showFlag == 0) return -1;
 			
 			int ft = Dialog.flag2ft(showFlag);
 			ImagePlus imps[] = Dialog.flag2imp(showFlag);
-			if (imps == null) return 0;
+			if (imps == null) return -1;
 			
 			IJIF.notice("creating 3D surface rendered model...This takes some moments.");
 			
 			Content cBone = add3D(imps[ft - 1]);
-			cBone.setTransparency(transparency);
+			//cBone.setTransparency(transparency);
 			
-			if (imps[2] != null) {
+			if (imps.length > 2 && imps[2] != null) {
 				Content cTun = add3D(imps[2], new Color3f(1f,0,0));
 				
 				ResultsTable rt = Analyzer.getResultsTable();
@@ -460,10 +529,10 @@ public class IJIF3D {
 			
 			univ.resetView();
 			
-			if (ft == 1)
+			if (ft == FEM)
 				univ.rotateToPositiveXZ();
 			
-			return ft;
+			return 0;
 		}
 		
 		private static int createSystemDetermineView() {
@@ -531,7 +600,7 @@ public class IJIF3D {
 			if (ft == 0 || ft == 3) return -1;
 			
 			Content cBone, cTun;
-			if (ft == Dialog.FEM) {
+			if (ft == FEM) {
 				if ((cBone = univ.getContent("LFCOnly")) != null)
 					cBone = univ.getContent("FemOnly");
 				cTun = univ.getContent("TunOnlyFem");
@@ -554,7 +623,7 @@ public class IJIF3D {
 			
 			for (int i = 0; i < pl.size(); i++) {
 				double x, y, z;
-				if (ft == Dialog.FEM) {
+				if (ft == FEM) {
 					x = pl.get(i).y;
 					y = pl.get(i).z;
 					z = pl.get(i).x;
@@ -601,7 +670,7 @@ public class IJIF3D {
 		
 		public static int save(String basepath) {
 			if (rt3d != null && rt3d.size() > 0)
-				rt3d.save(IJX.Util.createPath(basepath, FILENAME_RESULTS3D));
+				rt3d.save(IJX.Util.createPath(basepath, Quadrant.FILENAME_RESULTS3D));
 			
 			String snapshots[] = IJX.getWindowTitles("3D-.*");
 			
@@ -612,6 +681,201 @@ public class IJIF3D {
 			return 0;
 		}
 	}
+	
+	static class Grafter {
+		public static int view3d() {
+			if (open3D() == null)
+				return IJX.error("3D Viewer not available.", -1);
+			
+			hideAllContents();
+			int showFlag = Dialog.multiBones("Choice", "Select below for 3D model to show.");
+			if (showFlag == 0) return 0;
+			
+			ImagePlus imps[] = Dialog.flag2imp(showFlag);
+			if (imps == null) return 0;
+			
+			int nTun = Dialog.flag2tunnels(showFlag);
+			int ft = Dialog.flag2ft(showFlag);
+			
+			IJIF.notice("creating 3D surface rendered model...This takes some moments.");
+			
+			for (int i = 0; i < imps.length; i++) {
+				if (imps[i] != null) {
+					Content c;
+				
+					if (i < 2 && imps[i] != null) {
+						c = add3D(imps[i]);
+						//c.setTransparency(transparency);
+					} else if (i >= 2 && i < 2 + nTun && imps[i] != null) { // Tunnels
+						c = add3D(imps[i], new Color3f(1f,0,0));
+						
+						/*
+						ResultsTable rt = Analyzer.getResultsTable();
+						if (rt != null) {
+							if (nTun == 2)
+								addPointFromResults(c, i - 1, rt);
+							else
+								addPointFromResults(c, ft, rt);
+						}
+						*/
+					} else if (i >= 2 + nTun && imps[i] != null) { // Grafts
+						c = add3D(imps[i], new Color3f(0,1f,0));
+					}
+				}
+			}
+			
+			/*
+			univ.resetView();
+			
+			if (ft == FEM)
+				univ.rotateToPositiveXZ();
+			*/
+			
+			return 0;
+		}
+		
+		public static int showPoints() {
+			if (open3D() == null)
+				return IJX.error("3D Viewer not available.", -1);
+			
+			int showFlag = Dialog.content2flag(true);
+			int ft = Dialog.flag2ft(showFlag);
+			Calibration cal = IJX.getBaseCalibration();
+			
+			ResultsTable rts[] = new ResultsTable[2];
+			rts[0] = Analyzer.getResultsTable();
+			rts[1] = IJX.getResultsTable("Results3D");
+			
+			for (ResultsTable rt: rts) {
+				if (rt != null && rt.getColumnIndex("QuadX") != ResultsTable.COLUMN_NOT_FOUND) {
+					for (int i = 0; i < rt.size(); i++) {
+						XY quad = new XY(rt.getValue("QuadX", i), rt.getValue("QuadY", i));
+						String l = rt.getLabel(i);
+						Content c = null;
+						XYZ pnt3d = null;
+						if (l.startsWith(Quadrant.WINTITLE_FEM2D) && (ft & FEM) != 0) {
+							pnt3d = QuadrantGrafter.get3DPointFromQuadCoordFem(quad);
+							if ((c = univ.getContent("TunOnlyFem")) == null)
+								if ((c = univ.getContent("LFCOnly")) == null)
+									c = univ.getContent("FemOnly");
+						} else if (l.startsWith(Quadrant.WINTITLE_TIB2D) && (ft & TIB) != 0) {
+							pnt3d = QuadrantGrafter.get3DPointFromQuadCoordTib(quad);
+							if ((c = univ.getContent("TunOnlyTib")) == null)
+								c = univ.getContent("TibOnly");
+								
+						}
+						
+						if (pnt3d != null && c != null) {
+							pnt3d.px2real(cal);
+							addPoint(c, pnt3d);
+						}
+					}
+				}
+			}
+			
+			return 0;
+		}
+		
+		public static int modifyAppearance() {
+			if (univ == null)
+				return -1;
+			
+			AppearanceRow ar[] = appearanceDialog();
+			if (ar != null)
+				for (int i = 0; i < ar.length; i++) {
+					Content c;
+					if ((c = univ.getContent(ar[i].label)) != null) {
+						c.setVisible(ar[i].getVisible());
+						c.setColor(new Color3f(ar[i].getColor()));
+						//c.setTransparency(ar[i].getTransparency());
+					}
+				}
+			
+			return 0;
+		}
+		
+		private static AppearanceRow[] appearanceDialog() {
+			ArrayList<AppearanceRow> arList = new ArrayList();
+			
+			Panel panel = new Panel();
+			GridBagLayout pgrid = new GridBagLayout();
+			GridBagConstraints pc  = new GridBagConstraints();
+			panel.setLayout(pgrid);
+			pc.anchor = GridBagConstraints.WEST;
+			int y = 0;
+			String names1[] = { "LFCOnly", "FemOnly", "TibOnly", "TunOnlyFem", "TunOnlyTib" };
+			String names2[] = getContentNames("Graft-.*", false);
+			String names[] = (String[])IJX.Util.concatArray(names1, names2);
+			for (String str: names) {
+				Content c;
+				if ((c = univ.getContent(str)) != null) {
+					Color col = c.getColor().get();
+					//float t = c.getTransparency();
+					
+					AppearanceRow ar = new AppearanceRow(str, c.isVisible(), col);
+					pc.gridx = 0; pc.gridy = y;
+					pgrid.setConstraints(ar.cbox, pc);
+					panel.add(ar.cbox);
+					
+					pc.gridx = 1; pc.gridy = y++;
+					pgrid.setConstraints(ar.choice, pc);
+					panel.add(ar.choice);
+					/*
+					pc.gridx = 2; pc.gridy = y++;
+					pgrid.setConstraints(ar.tf, pc);
+					panel.add(ar.tf);
+					*/
+					
+					arList.add(ar);
+				}
+			}
+			
+			GenericDialog gd = new GenericDialog("Appearance Editor");
+			gd.addPanel(panel);
+			gd.showDialog();
+			
+			if (gd.wasOKed())
+				return arList.toArray(new AppearanceRow[0]);
+			return null;
+		}
+	}
+}
+
+class AppearanceRow {
+	public String label;
+	public Checkbox cbox;
+	public Choice choice;
+	private static final String colorStrs[] = new String[] { "White", "Red", "Green", "Blue", "Yellow", "Cyan", "Magenta" };
+	private static final Color colors[] = new Color[] { Color.WHITE, Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW, Color.CYAN, Color.MAGENTA };
+	
+	public AppearanceRow(String label, boolean isVisible, Color col) {
+		cbox = new Checkbox(this.label = label);
+		cbox.setState(isVisible);
+		
+		choice = new Choice();
+		for (String colStr: colorStrs)
+			choice.addItem(colStr);
+		for (int i = 0; i < colors.length; i++)
+			if (colors[i].equals(col))
+				choice.select(i);
+	}
+	
+	public String toString() {
+		return "AppearanceRow: "+label + "(" + cbox.getState() + "): " + choice.getSelectedItem();
+	}
+	
+	public Color getColor() {
+		return colors[this.choice.getSelectedIndex()];
+	}
+	
+	public boolean getVisible() {
+		return this.cbox.getState();
+	}
+	/*
+	public float getTransparency() {
+		return Float.parseFloat(tf.getText());
+	}
+	*/
 }
 
 class IJIFBehavior extends InteractiveBehavior {
