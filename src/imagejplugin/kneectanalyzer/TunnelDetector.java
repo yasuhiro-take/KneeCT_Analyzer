@@ -59,21 +59,26 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	private Button btnDel, btnAdd;
 	private Checkbox cbox;
 	
-	private static final int FEM = Quadrant.FEM, TIB = Quadrant.TIB;  
+	private static final int FEM = Quadrant.FEM, TIB = Quadrant.TIB;
+	
+	
+	@Override public void run(String arg) {
+		directrun();
+	}
 
-	@Override public void run(String arg) { 
+	public String directrun() { 
 		int quadsys = Quadrant.SysCoord.getDetermined();
 		if (quadsys == 0) {
 			IJ.error("Before tunnel detection, determine Quadrant System first.");
-			return;
+			return null;
 		}
 		
 		int ft = dialog(quadsys), r;
 		if (ft == FEM) r = detectFemoralTunnel();
 		else if (ft == TIB) r = detectTibialTunnel();
-		else return;
+		else return null;
 		
-		if (r != 0) return;
+		if (r != 0) return null;
 		
 		imp2D = Quadrant.get2DImage(ft, true);
 		drawTunnelApertures(imp2D, tunnelRois);
@@ -85,16 +90,22 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		
 		r = startTunnelEditor(rt);
 		imp2D.killRoi();
+		String outputImages = null;
 		if (r == 0) {
+			outputImages = imp2D.getTitle();
 			XY xy[] = outputToResults(ft);
-			if (cbox.getState())
+			if (cbox.getState()) {
 				createTunnelModel(ft);
+				outputImages += " & " + "TunOnly" + ((ft == FEM) ? "Fem" : "Tib");
+			}
 			finalizeTunnelApertures(imp2D, xy, ft);
 		} else {
 			clearTunnelApertures(imp2D);
 		}
 		
 		imp2D.hide(); imp2D.show();
+		
+		return outputImages;
 	}
 	
 	public int detectFemoralTunnel() {
