@@ -40,6 +40,7 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 	
 	private int status;
 	private String basePathLast;
+	private String outputImages;
 	
 	/**
 	 * Launch the application.
@@ -98,7 +99,7 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 					}
 				} else {
 					msg = "Models available, but lacking automatically analyzed data. ";
-					msg += "Determine quadrant coordinates manually (*" + btntitles[1] + "*).";
+					msg += "Determine quadrant coordinate system manually (*" + btntitles[1] + "*).";
 					label_2L.setIcon(arrowR);
 				}
 			} else {
@@ -120,7 +121,7 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 				label_save.setIcon(arrowD);
 			} else {
 				msg = "Available Quadrant system: " + quadStatus[qsystem] + ".\n";
-				msg += "Proceed to *"+btntitles[1]+"* to manually determine Quadrant coordinates, or *";
+				msg += "Proceed to *"+btntitles[1]+"* to manually determine Quadrant coordinate system, or *";
 				msg += btntitles[2]+"* for available system.\n";
 				label_2L.setIcon(arrowR);
 				label_3L.setIcon(arrowR);
@@ -134,7 +135,8 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 			break;
 		} 
 		case 3: {
-			String msg = "Detected tunnel data are listed in Results window, with 2D and 3D images.\n";
+			String msg = "Detected tunnel data are listed in Results window";
+			msg += (outputImages != null) ? " with image data (" + outputImages + ").\n" : ".\n"; 
 			msg += "You can save these data in KCA folder ";
 			msg += "(*floppy icon*).\n";
 			
@@ -280,7 +282,15 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 			r = (toggleSwitch == 1) ? IJIF.Quad.determineSystem2D() : IJIF3D.Quad.determineSystem3D();
 			break;
 		case '3':
-			r = (toggleSwitch == 1) ? IJIF.Quad.detectTunnel2D() :IJIF3D.Quad.refreshResults3D(); 		
+			if (toggleSwitch == 1) {
+				if ((outputImages = IJIF.Quad.detectTunnel2D()) == null)
+					r = -1;
+				else
+					r = 0;
+				
+			} else {
+				r = IJIF3D.Quad.refreshResults3D();
+			}
 			break;
 		case '4':
 			r = (toggleSwitch == 1) ? IJIF.Quad.refreshResults() : IJIF3D.Quad.snapshot();
