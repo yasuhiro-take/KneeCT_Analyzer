@@ -601,7 +601,7 @@ public class IJIF3D {
 			
 			Content cBone, cTun;
 			if (ft == FEM) {
-				if ((cBone = univ.getContent("LFCOnly")) != null)
+				if ((cBone = univ.getContent("LFCOnly")) == null)
 					cBone = univ.getContent("FemOnly");
 				cTun = univ.getContent("TunOnlyFem");
 			} else {
