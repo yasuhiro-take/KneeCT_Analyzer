@@ -51,7 +51,7 @@ import ij.text.TextWindow;
 import ij.util.Tools;
 
 public class TunnelDetector implements PlugIn, Measurements, ActionListener {
-	private double minSize, maxSize, minCirc, maxCirc;
+	private double minSize = 5, maxSize = 300, minCirc = 0.5, maxCirc = 1.0;
 	private Analyzer analyzer;
 	private QRoiList tunnelRois;
 	private TextPanel tp;
@@ -60,6 +60,9 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 	private Checkbox cbox;
 	
 	private static final int FEM = Quadrant.FEM, TIB = Quadrant.TIB;
+	
+	public TunnelDetector() {
+	}
 	
 	
 	@Override public void run(String arg) {
@@ -168,8 +171,11 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		else 
 			gd.addMessage("F/T: " + items[quadsys - 1]);
 		
-		gd.addStringField("Size ("+units+"):", "5-300", 12);
-		gd.addStringField("Circularity:", "0.5-1.0", 12);
+		String defaultSize = Double.toString(minSize) + "-" + Double.toString(maxSize);
+		String defaultCirc = Double.toString(minCirc) + "-" + Double.toString(maxCirc);
+		
+		gd.addStringField("Size ("+units+"):", defaultSize, 12); //TODO
+		gd.addStringField("Circularity:", defaultCirc, 12); //TODO
 		gd.showDialog();
 		
 		if (gd.wasCanceled()) return 0;
@@ -183,17 +189,13 @@ public class TunnelDetector implements PlugIn, Measurements, ActionListener {
 		String size = gd.getNextString(); 
 		String circ = gd.getNextString(); 
 		
-		String[] minAndMax = Tools.split(size, " -");
-		double min = minAndMax.length>=1?gd.parseDouble(minAndMax[0]):0.0;
-		double max = minAndMax.length==2?gd.parseDouble(minAndMax[1]):Double.NaN;
-		minSize = Double.isNaN(min) ? 0 : min;
-		maxSize = Double.isNaN(max) ? Double.MAX_VALUE : max;
+		double ranges[] = IJX.Util.stringRange2double(size);
+		minSize = ranges[0];
+		maxSize = ranges[1];
 		
-		minAndMax = Tools.split(circ, " -");
-		min = minAndMax.length>=1?gd.parseDouble(minAndMax[0]):0.0;
-		max = minAndMax.length==2?gd.parseDouble(minAndMax[1]):Double.NaN;
-		minCirc = Double.isNaN(min) ? 0.0 : min;
-		maxCirc = Double.isNaN(max) ? 1.0 : max;
+		ranges = IJX.Util.stringRange2double(circ, 0, 1);
+		minCirc = ranges[0];
+		maxCirc = ranges[1];
 		
 		return ft;
 	}
