@@ -1,10 +1,49 @@
 package imagejplugin.kneectanalyzer;
 
+import ij.IJ;
 import ij.ImagePlus;
+import ij.plugin.PlugIn;
 import ij.gui.Line;
 import ij.gui.RotatedRectRoi;
 
-public class RotRectTool {
+public class ManualQuadrantDefiner implements PlugIn {
+	@Override public void run(String arg) {
+		directrun();
+	}
+	
+	public int directrun() { 
+		int ft = IJX.radiobuttonFTDialog("Choice", "Choose below to manually determine.", "Quadrant System");
+		if (ft == 0) return -1;
+		
+		ImagePlus imp = Quadrant.get2DImage(ft, true);
+		
+		XY qxy[] = Quadrant.SysCoord.getPx(ft);
+		RotRectTool rrt = (qxy != null) ? new RotRectTool(qxy) : new RotRectTool(imp); 
+		RotatedRectRoi rrect = rrt.makeRoi();	
+		imp.setRoi(rrect);
+		IJ.setTool("rotrect");
+		
+		int r = IJX.WaitForUser("Modify Rotated Rect Roi to fit the Quadrant system.\n"+
+								"Then click OK.");
+		if (r == -1) return -1;
+		
+		RotatedRectRoi rrectN = (RotatedRectRoi)imp.getRoi();
+		RotRectTool rrt2 = new RotRectTool(rrectN);
+		qxy = rrt2.toSysCoords(ft);
+		if (qxy == null)
+			return IJX.error("Unexpected Error:"+ft+" "+rrt2.isUnrotatedRect()+rrt2.isDiagonalHorizontal() + rrt2.isDiagonalVertical(), -1);
+				
+		Quadrant.drawAsOverlay(imp, qxy, Quadrant.COORDSTRS[ft]);
+		
+		Quadrant.SysCoord.outputPx(ft, qxy);
+		
+		return 0;
+	}
+	
+	
+}
+
+class RotRectTool {
 	private XY[] rectxy = new XY[4];
 	private XY[] rotxy = new XY[2];
 	private XY centroid;
