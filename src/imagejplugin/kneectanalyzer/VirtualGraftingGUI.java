@@ -211,6 +211,10 @@ public class VirtualGraftingGUI extends CommonGUI {
 			basePathLast = null;
 			
 			break;
+		case 'q':
+			IJIF.Property.settingDialog();
+			r = 0;
+			break;
 		case '1':
 			r = (toggleSwitch == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Grafter.view3d();
 			break;

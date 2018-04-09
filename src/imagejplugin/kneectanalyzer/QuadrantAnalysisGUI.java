@@ -275,6 +275,10 @@ public class QuadrantAnalysisGUI extends CommonGUI {
 			basePathLast = null;
 			
 			break;
+		case 'q':
+			IJIF.Property.settingDialog();
+			r = 0;
+			break;
 		case '1':
 			r = (toggleSwitch == 1) ? IJIF.Quad.detectSystem2D() : IJIF3D.Quad.view3dOne(true);
 			break;

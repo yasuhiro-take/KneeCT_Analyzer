@@ -95,6 +95,7 @@ public class CommonGUI implements ActionListener {
 		//frame.getContentPane().add(button_q, "10, 4");
 		grid.setConstraints(btn_q, c);
 		frame.add(btn_q);
+		btn_q.addActionListener(this);
 		
 		c.gridx = 0; c.gridy = y++; c.gridwidth = 6; c.ipady = 4; //c.weighty = 5; 
 		JSeparator separator = new JSeparator();
@@ -223,6 +224,7 @@ public class CommonGUI implements ActionListener {
 		if (o == btn_open) btn = 'o';
 		else if (o == btn_save) btn = 's';
 		else if (o == btn_close) btn = 'c';
+		else if (o == btn_q) btn = 'q';
 		else if (o == btn_1) btn = '1';
 		else if (o == btn_2) btn = '2';
 		else if (o == btn_3) btn = '3';
