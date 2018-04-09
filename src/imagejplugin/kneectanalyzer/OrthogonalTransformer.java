@@ -63,9 +63,10 @@ public class OrthogonalTransformer implements PlugIn {
 		if (r == -1) {
 			IJX.forceClose(impstack[0]);
 			lastImpAx = null;
-		}
+		} else
+			IJX.rename(lastImpAx, "Aligned " + impOriginal.getTitle());
+		
 		IJX.forceClose(mf.impOrthoView);
-		IJX.rename(lastImpAx, "Aligned " + impOriginal.getTitle());
 		
 		return r;
 	}
@@ -110,22 +111,21 @@ public class OrthogonalTransformer implements PlugIn {
 		Calibration cal = impSrc.getCalibration();
 				
 		// rotate ax
-		IJX.rotate(impSrc, angles[I_AXIAL]);
-		
 		if (flip[I_AXIAL])
 			IJ.run(impSrc, "Flip Horizontally", "stack");
+		IJX.rotate(impSrc, angles[I_AXIAL]);
 		
 		// ax->cor, & rotate
 		impstack[I_CORONAL] = IJX.reslice(impSrc, cal.pixelHeight, "Top"); 
-		IJX.rotate(impstack[I_CORONAL], angles[I_CORONAL]);
 		if (flip[I_CORONAL]) 
 			IJ.run(impstack[I_CORONAL], "Flip Vertically", "stack");
+		IJX.rotate(impstack[I_CORONAL], angles[I_CORONAL]);
 		
 		// cor->sag, & rotate
 		impstack[I_SAGITTAL] = IJX.reslice(impstack[I_CORONAL], cal.pixelWidth, "Left rotate");
-		IJX.rotate(impstack[I_SAGITTAL], angles[I_SAGITTAL]);
 		if (flip[I_SAGITTAL])
 			IJ.run(impstack[I_SAGITTAL], "Flip Horizontally", "stack");
+		IJX.rotate(impstack[I_SAGITTAL], angles[I_SAGITTAL]);
 				
 		// sag->ax
 		IJX.forceClose(impSrc);
@@ -258,7 +258,7 @@ class OrthogonalTransformerFilter implements ExtendedPlugInFilter, DialogListene
 		
 		gd.addMessage("Correct alignment by rotation and flipping in orhtogonal planes.\n" +
 				"You can repeat correction by 'Apply' button, until pressing 'Finish' button.\n"+
-				"Preview shows a temporally rotated/flipped images in 3-plane projections.");
+				"Preview shows temporally rotated/flipped images in 3-plane projections.");
 		
 		for (int i = 0; i < 3; i++)
 			gd.addNumericField(items[i] + " angle:", angle[i], 3);
