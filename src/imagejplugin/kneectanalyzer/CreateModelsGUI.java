@@ -67,8 +67,12 @@ public class CreateModelsGUI extends CommonGUI {
 			r = IJIF.openKCADirectory();
 			if (r == 0)
 				wintitle = IJIF.getOpenedTitle();
-			else 
-				r = (r > 0) ? 0 : -1;
+			else if (r > 0) {
+				r = 0;
+				wintitle = IJX.Util.getLastDirectory(IJIF.getBaseDirectory());
+				
+			} else
+				r = -1;
 			
 			break;
 		case 's':
@@ -83,6 +87,10 @@ public class CreateModelsGUI extends CommonGUI {
 			break;
 		case 'c':
 			r = IJIF.closeWorkingFiles(wintitle, "Aligned "+wintitle, "Base", "TibOnly", "FemOnly");
+			break;
+		case 'q':
+			IJIF.Property.settingDialog();
+			r = 0;
 			break;
 		case '1':
 			r = IJIF.Modeler.align();
