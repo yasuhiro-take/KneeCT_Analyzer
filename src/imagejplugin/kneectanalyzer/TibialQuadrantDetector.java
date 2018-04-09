@@ -17,8 +17,15 @@ import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import imagejplugin.kneectanalyzer.Quadrant.SysCoord;
 
-public class TibialQuadrantDetector implements PlugIn { 
+public class TibialQuadrantDetector implements PlugIn {
+	boolean skipTP;
+	double femCondyleSize = 225;
+	
 	public TibialQuadrantDetector() {
+	}
+	public TibialQuadrantDetector(boolean skipTibialPlateauAngle, double femCondyleSize) {
+		skipTP = skipTibialPlateauAngle;
+		this.femCondyleSize = femCondyleSize;
 	}
 	
 	@Override public void run(String arg) {
@@ -61,7 +68,8 @@ public class TibialQuadrantDetector implements PlugIn {
 		Calibration cal = impTPZ.getCalibration();
 		int H0 = impTPZ.getHeight();
 		
-		AnalyzeParticle ap = new AnalyzeParticle(150, cal, "BX BY Width Height Area");
+		double halfTPsize = femCondyleSize * 2 / 3;
+		AnalyzeParticle ap = new AnalyzeParticle(halfTPsize, cal, "BX BY Width Height Area");
 		
 		int pxdata[] = new int[H0];
 		double angle, angleSum = 0; 
@@ -153,30 +161,38 @@ public class TibialQuadrantDetector implements PlugIn {
 	
 	private double createTibPlateau(ImagePlus impTibSag) {
 		IJ.run(impTibSag, "Fill Holes", "stack");
-		Calibration cal = impTibSag.getCalibration();
 		ImagePlus impTibSagZ = IJX.zproject(impTibSag);
 		impTibSagZ.show();
 		
-		SimpleRotateFilter srf = new SimpleRotateFilter(0);
-		WindowManager.setCurrentWindow(impTibSagZ.getWindow());
-		new PlugInFilterRunner(srf, null, null);
+		double angle = 0;
+		if (!skipTP) {
+			SimpleRotateFilter srf = new SimpleRotateFilter(0);
+			WindowManager.setCurrentWindow(impTibSagZ.getWindow());
+			new PlugInFilterRunner(srf, null, null);
 		
-		if (!srf.wasOK)
-			return 0;
+			if (!srf.wasOK)
+				return 0;
+			angle = srf.angle;
+		}
 		
 		int w = impTibSag.getWidth(), h = impTibSag.getHeight();
 		
 		BoundaryData bd = RTBoundary.getProximal(BoundaryData.FIB);
 		if (bd == null)
 			bd = RTBoundary.getDistal(BoundaryData.TIB);
+		
+		int z;
+		if (skipTP) {
+			z = bd.z;
+		} else {
+			XY fibYZ = new XY(bd.y + bd.h, bd.z);
+			XY center = new XY(w / 2, h / 2);
+			XY fibYZr = IJX.Util.rotateXY(fibYZ, center, angle);
+			z = (int)fibYZr.y;
+		}
 			
-		XY fibYZ = new XY(bd.y + bd.h, bd.z);
-		XY center = new XY(w / 2, h / 2);
-		XY fibYZr = IJX.Util.rotateXY(fibYZ, center, srf.angle);
-		int z = (int)fibYZr.y;
-			
-		if (srf.angle != 0)
-			IJX.rotate(impTibSag, srf.angle);
+		if (angle != 0)
+			IJX.rotate(impTibSag, angle);
 			
 		ImageStack ims = impTibSag.getImageStack().crop(0, 0, 0, w, z, impTibSag.getNSlices());
 		impTibSag.setStack(ims);
@@ -184,11 +200,12 @@ public class TibialQuadrantDetector implements PlugIn {
 		ImagePlus impTP = IJX.createSag2Ax(impTibSag);
 		IJ.setThreshold(impTP, 64, 255, null); // TODO: threshold by user-defined ??
 		IJ.run(impTP, "Make Binary", "method=Default background=Default");
-		IJX.rename(impTP, "TibPlateau");
+		IJX.rename(impTP, "TibPlateau"); 
+		IJ.wait(50);
 		
 		IJX.forceClose(impTibSagZ);
 			
-		return srf.angle;
+		return angle;
 	}
 }
 
