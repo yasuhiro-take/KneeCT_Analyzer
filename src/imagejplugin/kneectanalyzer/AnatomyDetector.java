@@ -48,6 +48,36 @@ public class AnatomyDetector implements PlugIn, ImageListener {
 	private BoundaryTool bt;
 	private int flag, lastSlice, nrx;
 	private RoiManager rm;
+	private double condyleSize = 225, condyleRatioMin = 0.5, condyleRatioMax = 1.5, notchSize = 100, proxNotchAngle = 110;
+	private double fibX1 = 0.6, fibX2 = 1.0, fibY1 = 0.8, fibY2 = 1.2;
+	
+	public AnatomyDetector() {
+	}
+	
+	public void setMinimumCondyleSize(double size) {
+		condyleSize = size;
+	}
+	
+	public void setCondyleRatio(double min, double max) {
+		condyleRatioMin = min;
+		condyleRatioMax = max;
+	}
+	
+	public void setMinimumNotchSize(double size) {
+		notchSize = size;
+	}
+	
+	public void setMaximumProxNotchAngle(double angle) {
+		proxNotchAngle = angle;
+	}
+	
+	public void setFibularHeadLocation(double x1, double x2, double y1, double y2) {
+		fibX1 = x1;
+		fibX2 = x2;
+		fibY1 = y1;
+		fibY2 = y2;
+	}
+	
 	
 	@Override public void run(String arg) {
 		ImagePlus imp = WindowManager.getCurrentImage();   
@@ -62,12 +92,12 @@ public class AnatomyDetector implements PlugIn, ImageListener {
 	public int directRun(ImagePlus imp) {
 		this.imp = imp;
 				
-		BoundaryTool bt = new BoundaryTool(imp);
+		BoundaryTool bt = new BoundaryTool(imp, condyleSize);
 		bt.scanFEC();
-		bt.scanFemur();
+		bt.scanFemur(condyleRatioMin, condyleRatioMax);
 		bt.scanProxTibia();
-		bt.scanDistalTibia();
-		bt.scanProxNotch();
+		bt.scanDistalTibia(fibX1, fibX2, fibY1, fibY2);
+		bt.scanProxNotch(notchSize, proxNotchAngle);
 		
 		nrx = bt.getMeanNotchRoofX();
 		
