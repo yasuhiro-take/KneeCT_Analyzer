@@ -6,6 +6,7 @@ import ij.ImageStack;
 import ij.WindowManager;
 import ij.gui.DialogListener;
 import ij.gui.GenericDialog;
+import ij.gui.MultiLineLabel;
 import ij.io.DirectoryChooser;
 import ij.io.FileInfo;
 import ij.measure.Calibration;
@@ -24,10 +25,18 @@ import ij.text.TextWindow;
 
 import java.awt.AWTEvent;
 import java.awt.Scrollbar;
+import java.awt.TextField;
+import java.awt.Panel;
+import java.awt.Button;
+import java.awt.Font;
+import java.awt.BorderLayout;
 import java.util.Arrays;
 import java.util.Vector;
 
 import javax.swing.SwingWorker;
+
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 
 public class IJIF implements Measurements {
@@ -319,7 +328,7 @@ public class IJIF implements Measurements {
 	
 	public static int closeWorkingFiles(String... wintitles) {
 		for (String win: wintitles) {
-			if (win.endsWith(".*")) {
+			if (win != null && win.endsWith(".*")) {
 				String wins[] = IJX.getWindowTitles(win);
 				IJX.forceClose(wins);
 			} else
@@ -349,9 +358,116 @@ public class IJIF implements Measurements {
 		return 0;
 	}
 	
-	public static String getCurrentWindowTitle() {
-		ImagePlus imp = WindowManager.getCurrentImage();
-		return (imp != null) ? imp.getTitle() : null;
+	static class Property {
+		public static final int ALIGN_FEMORALSHAFT = 1, ALIGN_TIBIALPLATEAU = 2;
+		public static int sagAlignMode = ALIGN_TIBIALPLATEAU;
+		private static final String ALIGNMENTS[] = { "Femoral shaft", "Tibial plateau" };
+		public static double condyleSize = 225;
+		public static double condyleRatioMin = 0.5, condyleRatioMax = 1.5;
+		public static double fibX1 = 0.6, fibX2 = 1.0;
+		public static double fibY1 = 0.8, fibY2 = 1.2;
+		public static double notchSize = 100;
+		public static double proxNotchAngle = 110;
+		public static double minSagProjFemSize = 100;
+		public static double blumenOutlinerR1 = 10;
+		public static double blumenOutlinerR2 = 5;
+		public static double blumenOutlinerSD = 2;
+		public static final int FEMQUAD_DS0BY_CONDYLE = 1, FEMQUAD_DS0BY_BLUMENSAAT = 2;
+		public static int femQuadDS0Mode = FEMQUAD_DS0BY_CONDYLE;
+		private static final String FEMQUAD_DS0[] = { "Tangent to Condyle", "End of Blumensaat's line" };  
+		
+		private static Vector<TextField> numFields, strFields;
+		
+		public static void settingDialog() {
+			Calibration cal = IJX.getBaseCalibration();
+			String calUnit = cal != null ? cal.getUnit() : "pixel";
+			String calUnit2 = calUnit + "2";
+			String unit = " (in " + calUnit + "2)";
+			Font font = new Font("SansSerif", Font.PLAIN, 14);
+			
+			String condyleRangeStr = IJ.d2s(condyleRatioMin, 2) + "-" + IJ.d2s(condyleRatioMax, 2);
+			String fibxRangeStr = IJ.d2s(fibX1, 2) + "-" + IJ.d2s(fibX2, 2);
+			String fibyRangeStr = IJ.d2s(fibY1, 2) + "-" + IJ.d2s(fibY2, 2);
+						
+			GenericDialog gd = new GenericDialog("About and Settings");
+			
+			String msg1 = "KneeCT Analyzer\n";
+			msg1 += "Copyright (C) 2018 Yasuhiro Take\n";
+			msg1 += "License: GPLv3\n\n";
+			msg1 += "Icons are downloaded from http://icons8.com.\n";
+			gd.addMessage(msg1, font);
+			
+			gd.setInsets(5, 20, 0);
+			gd.addRadioButtonGroup("Alignment", ALIGNMENTS, 1, 2, ALIGNMENTS[sagAlignMode - 1]);
+			gd.addMessage("Detect Anatomy");
+			gd.addNumericField("min condyle size", condyleSize, 0, 4, calUnit2);										// 0
+			gd.addStringField("M/L condyle size diff. (M/L ratio)", condyleRangeStr, 12);								
+			gd.addStringField("               fibula ML location (relative to tibia)" , fibxRangeStr, 12);
+			gd.addStringField("               fibula AP location (relative to tibia)" , fibyRangeStr, 12);
+			gd.addNumericField("min notch size", notchSize, 0, 4, calUnit2);											// 1
+			gd.addNumericField("                               max prox notch angle", proxNotchAngle, 0, 4, "degree");	// 2
+			gd.addMessage("Detect Quadrant System (fem)");
+			gd.addNumericField("  min sag. femur size", minSagProjFemSize, 0, 4, calUnit2);								// 3
+			gd.addMessage("+Outliner for Blumensaat's line");
+			gd.addNumericField("SD > 5" + calUnit + " & residual >", blumenOutlinerR1, 1, 4, calUnit);					// 4
+			gd.addNumericField("SD > 2.5" + calUnit + " & residual >", blumenOutlinerR2, 1, 4, calUnit);				// 5
+			gd.addNumericField("SD > 2.5" + calUnit + " & residual >", blumenOutlinerSD, 2, 4, "x SD");					// 6
+			gd.setInsets(5, 20, 0);
+			gd.addRadioButtonGroup("+DS0 by", FEMQUAD_DS0, 1, 2, FEMQUAD_DS0[femQuadDS0Mode - 1]);
+			gd.addMessage("Create Graft Model");
+			
+			Panel p = new Panel();
+			p.setLayout(new BorderLayout());
+			Button btn = new Button("Reset");
+			btn.addActionListener(new ActionListener() {
+				@Override public void actionPerformed(ActionEvent e) {
+					int i = 0;
+					numFields.get(i++).setText(Integer.toString(225));
+					numFields.get(i++).setText(Integer.toString(100));
+					numFields.get(i++).setText(Integer.toString(110));
+					numFields.get(i++).setText(Integer.toString(100));
+					numFields.get(i++).setText(Double.toString(10));
+					numFields.get(i++).setText(Double.toString(5));
+					numFields.get(i++).setText(Double.toString(2));
+					
+					i = 0;
+					strFields.get(i++).setText("0.5-1.5");
+					strFields.get(i++).setText("0.6-1.0");
+					strFields.get(i++).setText("0.8-1.2");
+				} 
+			});
+			p.add("East", btn);
+			gd.addPanel(p);
+			
+			numFields = gd.getNumericFields();
+			strFields = gd.getStringFields();
+			
+			gd.showDialog();
+			
+			if (!gd.wasOKed()) return;
+			
+			String alignment = gd.getNextRadioButton();
+			sagAlignMode = IJX.Util.getIndexOf(ALIGNMENTS, alignment) + 1;
+			String femquad = gd.getNextRadioButton();
+			femQuadDS0Mode = IJX.Util.getIndexOf(FEMQUAD_DS0, femquad) + 1;
+			
+			condyleSize = gd.getNextNumber();
+			notchSize = gd.getNextNumber();
+			proxNotchAngle = gd.getNextNumber();
+			minSagProjFemSize = gd.getNextNumber();
+			blumenOutlinerR1 = gd.getNextNumber();
+			blumenOutlinerR2 = gd.getNextNumber();
+			blumenOutlinerSD = gd.getNextNumber();
+			
+			double range[] = IJX.Util.stringRange2double(gd.getNextString());
+			condyleRatioMin = range[0]; condyleRatioMax = range[1];
+			
+			range = IJX.Util.stringRange2double(gd.getNextString());
+			fibX1 = range[0]; fibX2 = range[1];
+			
+			range = IJX.Util.stringRange2double(gd.getNextString());
+			fibY1 = range[0]; fibY2 = range[1];
+		}
 	}
 	
 	static class Modeler {
@@ -499,6 +615,11 @@ public class IJIF implements Measurements {
 			if (imp == null) return -1;
 			
 			AnatomyDetector ad = new AnatomyDetector();
+			ad.setMinimumCondyleSize(Property.condyleSize);
+			ad.setCondyleRatio(Property.condyleRatioMin, Property.condyleRatioMax);
+			ad.setMinimumNotchSize(Property.notchSize);
+			ad.setMaximumProxNotchAngle(Property.proxNotchAngle);
+			ad.setFibularHeadLocation(Property.fibX1, Property.fibX2, Property.fibY1, Property.fibY2);
 			int r = ad.directRun(imp);
 			
 			if (r == -1) return -1;
@@ -554,23 +675,27 @@ public class IJIF implements Measurements {
 			if (fem) {
 				IJIF.notice("Analyzing femur...This may take some time...");
 				//Quadrant.detectFemoralSystem();
-				(new FemoralQuadrantDetector()).directRun();
+				FemoralQuadrantDetector qd = new FemoralQuadrantDetector();
+				qd.setSagittalFemoralProjectionSize(Property.minSagProjFemSize);
+				qd.setBlumensaatDetectionParams(Property.blumenOutlinerR1, Property.blumenOutlinerR2, Property.blumenOutlinerSD);
+				qd.setDS0ByCondyle(Property.femQuadDS0Mode == Property.FEMQUAD_DS0BY_CONDYLE);
+				qd.directRun();
 			}
 			if (tib) {
 				IJIF.notice("Analyzing tibia...This may take some time...");
-				(new TibialQuadrantDetector()).directRun();
+				(new TibialQuadrantDetector(Property.sagAlignMode == Property.ALIGN_TIBIALPLATEAU, Property.condyleSize)).directRun();
 			}
 			
 			return 0;
 		}
 		
 		public static String detectTunnel2D() {
-			return (new TunnelDetector()).directrun();
+			TunnelDetector td = new TunnelDetector();
+			return td.directrun();
 		}
 		
 		public static int determineSystem2D() {
-			Quadrant.setSystem();
-			return 0;
+			return (new ManualQuadrantDefiner()).directrun();
 		}
 		
 		public static int refreshResults() {
