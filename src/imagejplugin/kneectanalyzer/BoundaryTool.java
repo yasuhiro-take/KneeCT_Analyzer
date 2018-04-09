@@ -188,6 +188,7 @@ class BoundaryList {
 public class BoundaryTool extends BoundaryList implements Measurements  {
 	private ImagePlus imp;
 	private AnalyzeParticle ap;
+	private double condyleSize;
 	
 	final static int BD_MFC = BoundaryData.MFC;
 	final static int BD_LFC = BoundaryData.LFC;
@@ -209,15 +210,17 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		}
 	}
 	
-	public BoundaryTool(ImagePlus imp) {
+	public BoundaryTool(ImagePlus imp, double condyleSize) {
 		super();
+		
 		ImagePlus imp2 = imp.duplicate();
 		IJ.run(imp2, "Fill Holes", "stack");
 		IJ.run(imp2, "Open", "stack");
 		imp2.show();
 		
 		this.imp = imp2;
-		ap = new AnalyzeParticle(225, imp.getCalibration(), "BX BY Width Height X Y Area"); // TODO: size
+		ap = new AnalyzeParticle(condyleSize, imp.getCalibration(), "BX BY Width Height X Y Area");
+		this.condyleSize = condyleSize;
 	}
 	
 	public void close() {
@@ -283,7 +286,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		
 		int ic = IJX.Util.getMaxIndex(columns), ir = IJX.Util.getMaxIndex(rows);
 		
-		int nx1 = x, nx2 = x + w, ny1 = y, ny2 = y + h;
+		int nx1 = x, nx2 = x + w - 1, ny1 = y, ny2 = y + h - 1;
 		for (int i = ir; i >= 0; i--)
 			if (rows[i] == 0) {
 				ny1 = y + i; i = 0;
@@ -303,6 +306,9 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 			if (columns[i] == 0) {
 				nx2 = x + i; i = w;
 			}
+		
+		if (nx1 == x && nx2 == x + w - 1 && ny1 == y && ny2 == y + h - 1)
+			return null;
 		
 		r.x = nx1; r.y = ny1; r.w = nx2 - nx1 + 1; r.h = ny2 - ny1 + 1;
 		r.px2real(cal);
@@ -351,7 +357,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		return -1;
 	}
 	
-	public int scanFemur() {
+	public int scanFemur(double condyleratioMin, double condyleratioMax) {
 		final Calibration cal = imp.getCalibration();
 		
 		ArrayList<RXYA> pdlist = new ArrayList<RXYA>();
@@ -378,8 +384,9 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 					if (bdatNotchEnd == null && pdlist.size() == 2) {
 						// when the slice# for distal-end of notch is not determined,
 						RXYA pd1 = pdlist.get(0), pd2 = pdlist.get(1); 
+						double arearatio = Math.min(pd1.area, pd2.area) / Math.max(pd1.area, pd2.area);
 						if (Math.abs(pd1.cx - pd2.cx) > Math.abs(pd1.cy - pd2.cy) &&
-							Math.abs(pd1.area - pd2.area) / (pd1.area + pd2.area) < 0.4) {
+							condyleratioMin < arearatio && arearatio < condyleratioMax) {
 							// when two particles locate medio-laterally, not antero-posteriorly
 							// the sizes of two particles are similar 
 							bdatNotchEnd = new BoundaryData(BD_NOTCHEND, z - 1,
@@ -396,9 +403,9 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 					} else if (bdatM != null || bdatL != null) {
 						// when medial or lateral condyle is separately identified in the previous slice	
 						for (RXYA pd: pdlist) {
-							if (bdatM != null && bdatM.isInside(pd.cx, pd.cy))
+							if (bdatM != null && bdatM.isInside(pd.cx, pd.cy) && bdatM.getArea() >= pd.area)
 								rectM = pd.r;
-							if (bdatL != null && bdatL.isInside(pd.cx, pd.cy))
+							if (bdatL != null && bdatL.isInside(pd.cx, pd.cy) && bdatL.getArea() >= pd.area)
 								rectL = pd.r;
 						}
 
@@ -466,7 +473,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 				BoundaryData bdatM = find(BD_MFC, z), bdatL = find(BD_LFC, z);
 				if (bdatM != null)	bdatM.fill(imp); 
 				if (bdatL != null) bdatL.fill(imp);
-				r = reduceBoundaryBox((ByteProcessor)ip, cal, bdatT);
+				r = reduceBoundaryBox2((ByteProcessor)ip, cal, bdatT);
 			}
 			
 			if (r != null) {
@@ -477,7 +484,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		}
 	}
 	
-	public void scanDistalTibia() {
+	public void scanDistalTibia(double fibx1, double fibx2, double fiby1, double fiby2) {
 		BoundaryData bdatM = findProximal(BoundaryData.MFC);
 		BoundaryData bdatL = findProximal(BoundaryData.LFC);
 		double FCw = (bdatL.x + bdatL.w - bdatM.x);
@@ -488,7 +495,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		BoundaryData bdatT = findDistal(BoundaryData.TIB);
 		int z0 = bdatT.z + 1;
 		
-		AnalyzeParticle apT = new AnalyzeParticle(25, imp.getCalibration(), "BX BY Width Height X Y Area");
+		AnalyzeParticle apT = new AnalyzeParticle(condyleSize / 10, imp.getCalibration(), "BX BY Width Height X Y Area");
 				
 		for (int z = z0; z < imp.getNSlices(); z++) {
 			int nResults = apT.newAnalyze(imp, z + 1);
@@ -505,8 +512,8 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 						double areaTib = rectT.w * rectT.h;
 						Rect rectF = new Rect(apT.getMultiColumnValues(0, 3, iFib));
 						
-						if (rectT.x + rectT.w * 0.6 < rectF.x && rectF.x < rectT.x + rectT.w &&
-							rectT.y + rectT.h * 0.8 < rectF.y && rectF.y < rectT.y + rectT.h * 1.2 &&
+						if (rectT.x + rectT.w * fibx1 < rectF.x && rectF.x < rectT.x + rectT.w  * fibx2 &&
+							rectT.y + rectT.h * fiby1 < rectF.y && rectF.y < rectT.y + rectT.h * fiby2 &&
 							0.7 < areaTib / areaLFMC && areaTib / areaLFMC < 1.3) {
 							rectT = null;
 							bdlist.add(new BoundaryData(BoundaryData.FIB, z, rectF));
@@ -521,7 +528,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		}
 	}
 	
-	public void scanProxNotch() {
+	public void scanProxNotch(double notchSize, double proxNotchAngle) {
 		final Calibration cal = imp.getCalibration();
 		ImagePlus imp2 = imp.duplicate();
 		int H0 = imp2.getHeight();
@@ -529,7 +536,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 		
 		int notchop = ParticleAnalyzer.EXCLUDE_EDGE_PARTICLES;
 		AnalyzeParticle apNotch = new AnalyzeParticle(notchop, AnalyzeParticle.defaultMeasurements, 
-				100, cal, "BX BY Width Height X Y");
+				notchSize, cal, "BX BY Width Height X Y");
 		BoundaryData bdatF = findProximal(BD_FEM);
 		BoundaryData bdatM = findProximal(BD_MFC);
 		BoundaryData bdatL = findProximal(BD_LFC);
@@ -594,7 +601,7 @@ public class BoundaryTool extends BoundaryList implements Measurements  {
 					PolygonRoi pol = new PolygonRoi(x, y, 3, Roi.ANGLE);
 					double a = pol.getAngle();
 						
-					if (a > 110) { // || y[1] < maxNRy - (5 / cal.pixelHeight)) { // TODO
+					if (a > proxNotchAngle) { // || y[1] < maxNRy - (5 / cal.pixelHeight)) {
 						cont = false; //rectN = null;
 					} else {
 						bdatNotch = new BoundaryData(BD_NOTCH, z, rectN);
