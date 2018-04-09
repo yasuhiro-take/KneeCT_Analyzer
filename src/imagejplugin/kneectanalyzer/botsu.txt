@@ -188,3 +188,382 @@ public double[] getAngles3D(String wintitle) {
 	
 	
 }*/
+
+static class Modeler {		
+		public static int determineFEC(String wintitle) {
+			if (IJIF3D.open3D() == null)
+				return -1;
+		
+		//GUI.center(univ.getWindow());
+		
+			ImagePlus grey = WindowManager.getImage(wintitle);
+		
+			IJIF.notice("creating 3D surface rendered model...This takes some moments.");
+			Content c = add3D(grey, wintitle);
+		
+		/*
+		IJIFPointListListener pll = new IJIFPointListListener();
+		c.getPointList().addPointListListener(pll);
+		*/
+			IJIF.notice("Rotate the 3D image by the hand tool, and registrate the medial and lateral femoral epicondyles by the point tool.");
+			
+			do {
+				c = (univ != null) ? univ.getContent(wintitle) : null;
+			
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {}
+				//} while (c != null && univ != null && pll.pointNum < 2);
+			} while (c != null && univ != null && c.getPointList().size() < 2);
+		
+			if (c == null) // 3D-window closed, or object removed
+				return -1;
+		//if (pll.pointNum < 2 || c.getPointList().size() < 2) return null;
+			
+			IJIF.setFEC(convertPLtoMy(c.getPointList()));
+		
+			return -1;
+		}
+		
+		public static void updateFEC(String wintitle) {
+			if (univ != null) {
+				Content c = univ.getContent(wintitle);
+				if (c != null)
+					IJIF.setFEC(convertPLtoMy(c.getPointList())); //update fec for the case when a point is moved after determineFECBy3D().
+			}
+		}
+		
+		public static void showModelAndPoints(ImagePlus imp, mPointList pl) {
+			removeAllContents();
+			Content c = add3D(imp, imp.getTitle());
+			
+			for (int i = 0; i < pl.size(); i++)
+				c.getPointList().add(pl.get(i).name, pl.get(i).x, pl.get(i).y, pl.get(i).z);
+			c.showPointList(true);
+		}
+	}
+	
+	
+	private static int determineFemEpiCondylesBy2D(ImagePlus imp) {
+		Rect rect[] = findMaxParticlePerSlice(imp);
+		double b_area[] = new double[imp.getNSlices()];
+		
+		for (int i = 0; i < b_area.length; i++)
+			b_area[i] = (rect[i] != null) ? rect[i].w * rect[i].h : 0;
+		
+		
+		int[] slices = getMaximaParticleSlices(b_area);
+		String msg = "Please choose the most probable epicondyle-containing slice.";
+		
+		SliceChooseFilter scf = new SliceChooseFilter(slices, "Select Epicondyle Slice", msg);			 
+		
+		imp.getWindow().toFront();
+		WindowManager.setCurrentWindow(imp.getWindow());
+		
+		new PlugInFilterRunner(scf, null, null);
+		
+		if (!scf.wasOK)
+			return -1;
+		
+		int s = slices[scf.getChoice()];
+		
+		Calibration cal = imp.getCalibration();
+		double xyz[] = new double[6];
+		xyz[0] = rect[s].x; 
+		xyz[1] = rect[s].y + rect[s].h / 2; 
+		xyz[2] = s * cal.pixelDepth;
+		xyz[3] = xyz[0] + rect[s].w; 
+		xyz[4] =xyz[1]; 
+		xyz[5] = xyz[2];
+		
+		setFEC(xyz);
+		
+		return 0;
+	}
+	
+	public static boolean isFEC() {
+		if (IJIF.fec != null && IJIF.fec.size() == 2)
+			return true;
+		return false;
+	}
+	
+	public static void setFEC(double xyz[]) {
+		if (fec == null)
+			fec = new mPointList();
+			
+		fec.clear();
+		fec.add("MFEC", xyz[0], xyz[1], xyz[2]);
+		fec.add("LFEC", xyz[3], xyz[4], xyz[5]);
+	}
+	
+	public static void setFEC(mPointList mpl) {
+		IJIF.fec = mpl;
+	}
+	
+	private static Rect[] findMaxParticlePerSlice(ImagePlus imp) {
+		AnalyzeParticle ap = new AnalyzeParticle(300, imp.getCalibration(), "Area BX BY Width Height");
+		
+		int nSlices = imp.getNSlices();
+		Rect rect[] = new Rect[nSlices];
+		
+		for (int s = 0; s < nSlices; s++) {
+			int nResults = ap.newAnalyze(imp, s + 1);
+					
+			if (nResults > 0) {
+				double area[] = ap.getAllRowValues(0);
+				int row_maxarea = IJX.Util.getMaxIndex(area);
+				rect[s] = new Rect(ap.getMultiColumnValues(1, 4, row_maxarea));
+			}
+		}
+		
+		return rect;
+	}
+	private static int[] getMaxParticleSlices(double b_area[]) {
+		int slices[] = new int[20];
+		double[] b_area_sorted = b_area.clone();
+		double[] b_area_unique = new double[b_area.length];
+		
+		Arrays.sort(b_area_sorted);
+		
+		double lastvalue = 0;
+		for (int i = b_area.length - 1, j = 0; i >= 0; i--)
+			if (b_area_sorted[i] != lastvalue)
+				b_area_unique[j++] = lastvalue = b_area_sorted[i];
+		
+		for (int s = 0, u = 0; s < 20 && u < b_area.length; u++) {
+			for (int i = 0; i < b_area.length; i++) {
+				if (b_area[i] == b_area_unique[u]) {
+					slices[s++] = i;
+					for (int j = Math.max(i - 5, 0); j <= Math.min(i + 5, b_area.length - 1); j++)
+						b_area[j] = 0;
+					i = b_area.length;
+				}
+			}
+		}
+		
+		return slices;
+	}
+	
+	private static int[] getMaximaParticleSlices(double b_area[]) {
+		int[] slices = null;
+		
+		try {
+			if (Class.forName("ij.plugin.filter.MaximumFinder") != null)
+				if (MaximumFinder.class.getMethod("findMaxima") != null)
+				slices = MaximumFinder.findMaxima(b_area, 1.0, 1);
+		} catch (ClassNotFoundException e) {
+			slices = getMaxParticleSlices(b_area);
+		} catch (NoSuchMethodException e) {
+			slices = getMaxParticleSlices(b_area);
+		}
+		
+		return slices;
+	}
+	
+	class frameWindowListener implements WindowListener {
+
+		@Override public void windowActivated(WindowEvent arg0) {}
+
+		@Override public void windowClosed(WindowEvent arg0) {
+			// TODO Auto-generated method stub
+			//opened = false;
+			System.out.println("window cloed");
+			instance = null;
+		}
+
+		@Override public void windowClosing(WindowEvent arg0) {}
+		@Override public void windowDeactivated(WindowEvent arg0) {}
+		@Override public void windowDeiconified(WindowEvent arg0) {}
+		@Override public void windowIconified(WindowEvent arg0) {}
+		@Override public void windowOpened(WindowEvent arg0) {}
+	}
+	private void createWindow() {
+		//frame.setBounds(100, 100, 350, 400);
+		//frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+		/*
+		frame.getContentPane().setLayout(new FormLayout(new ColumnSpec[] {
+				FormFactory.RELATED_GAP_COLSPEC,
+				FormFactory.DEFAULT_COLSPEC,
+				FormFactory.RELATED_GAP_COLSPEC,
+				FormFactory.DEFAULT_COLSPEC,
+				FormFactory.RELATED_GAP_COLSPEC,
+				FormFactory.DEFAULT_COLSPEC,
+				FormFactory.RELATED_GAP_COLSPEC,
+				ColumnSpec.decode("max(56dlu;default):grow"),
+				FormFactory.RELATED_GAP_COLSPEC,
+				FormFactory.DEFAULT_COLSPEC,},
+			new RowSpec[] {
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				FormFactory.DEFAULT_ROWSPEC,
+				FormFactory.RELATED_GAP_ROWSPEC,
+				RowSpec.decode("default:grow"),})); 
+				*/
+		arrowD = icons[4]; arrowR = icons[5];
+		
+		GridBagLayout grid = new GridBagLayout();
+		GridBagConstraints c  = new GridBagConstraints();
+		frame.setLayout(grid);
+		int y = 0;
+		
+		label_open = new JLabel(""); label_open.setIcon(arrowD);
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 1; c.gridheight = 1; c.anchor = GridBagConstraints.NORTH;
+		grid.setConstraints(label_open, c);
+		//frame.getContentPane().add(label_open, "2, 2, center, default");
+		frame.add(label_open);
+		
+		
+		
+		label_save = new JLabel("");
+		c.gridx = 1; 
+		grid.setConstraints(label_save, c);
+		//frame.getContentPane().add(label_save, "4, 2, center, default");
+		frame.add(label_save);
+		
+		c.gridx = 2;
+		label_close = new JLabel("");
+		//frame.getContentPane().add(label_close, "6, 2, center, default");
+		grid.setConstraints(label_close, c);
+		frame.add(label_close);
+		
+		c.gridx = 0; c.gridy = y++;
+		btn_open = new JButton("");
+		btn_open.setIcon(icons[0]);
+		//frame.getContentPane().add(btn_open, "2, 4");
+		grid.setConstraints(btn_open, c);
+		frame.add(btn_open);
+		btn_open.addActionListener(this);
+		
+		c.gridx = 1;
+		btn_save = new JButton("");
+		btn_save.setIcon(icons[1]);
+		//frame.getContentPane().add(btn_save, "4, 4");
+		grid.setConstraints(btn_save, c);
+		frame.add(btn_save);
+		btn_save.addActionListener(this);
+		
+		c.gridx = 2;
+		btn_close = new JButton("");		
+		btn_close.setIcon(icons[2]);
+		//frame.getContentPane().add(btn_close, "6, 4");
+		grid.setConstraints(btn_close, c);
+		frame.add(btn_close);
+		btn_close.addActionListener(this);
+		
+		c.gridx = 4;
+		btn_q = new JButton("");
+		btn_q.setIcon(icons[3]);
+		//frame.getContentPane().add(button_q, "10, 4");
+		grid.setConstraints(btn_q, c);
+		frame.add(btn_q);
+		
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 5; //c.weighty = 5; 
+		JSeparator separator = new JSeparator();
+		//frame.getContentPane().add(separator, "2, 6, 9, 1");
+		grid.setConstraints(separator, c);
+		frame.add(separator);
+		
+		c.gridy = y++; c.gridwidth = 1;c.fill = GridBagConstraints.HORIZONTAL; 
+		label_1L = new JLabel(""); label_1L.setIcon(arrowR);
+		//frame.getContentPane().add(label_1L, "2, 8, center, default");
+		grid.setConstraints(label_1L, c);
+		frame.add(label_1L);
+		
+		c.gridx = 1; c.gridwidth = 3; c.fill = GridBagConstraints.HORIZONTAL;
+		btn_1 = new Button(btntitles[0]);
+		/* btn_1.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+			}
+		});*/
+		//frame.getContentPane().add(btn_1, "4, 8, 5, 1");
+		grid.setConstraints(btn_1, c);
+		frame.add(btn_1);
+		btn_1.addActionListener(this);
+		
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 1;
+		label_2L = new JLabel(""); label_2L.setIcon(arrowR);
+		grid.setConstraints(label_2L, c);
+		frame.add(label_2L);
+		//frame.getContentPane().add(label_2L, "2, 10");
+		
+		c.gridx = 1; c.gridwidth = 3; c.fill = GridBagConstraints.HORIZONTAL;
+		btn_2 = new Button(btntitles[1]);
+		grid.setConstraints(btn_2, c);
+		frame.add(btn_2);
+		//frame.getContentPane().add(btn_2, "4, 10, 5, 1");
+		btn_2.addActionListener(this);
+		
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 1;
+		label_3L = new JLabel(""); label_3L.setIcon(arrowR);
+		grid.setConstraints(label_3L, c);
+		frame.add(label_3L);
+		//frame.getContentPane().add(label_3L, "2, 12");
+		
+		c.gridx = 1; c.gridwidth = 3; c.fill = GridBagConstraints.HORIZONTAL;
+		btn_3 = new Button(btntitles[2]);
+		grid.setConstraints(btn_3, c);
+		frame.add(btn_3);
+		//frame.getContentPane().add(btn_3, "4, 12, 5, 1");
+		btn_3.addActionListener(this);
+		
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 1;
+		label_4L = new JLabel("");
+		grid.setConstraints(label_4L, c); label_4L.setIcon(arrowR);
+		frame.add(label_4L);
+		//frame.getContentPane().add(label_4L, "2, 14");
+		
+		c.gridx = 1; c.gridwidth = 3; c.fill = GridBagConstraints.HORIZONTAL;
+		btn_4 = new Button(btntitles[3]);
+		grid.setConstraints(btn_4, c);
+		frame.add(btn_4);
+		//frame.getContentPane().add(btn_4, "4, 14, 5, 1");
+		btn_4.addActionListener(this);
+		
+		c.gridx = 0; c.gridy = y++; c.gridwidth = 5;
+		JSeparator separator_1 = new JSeparator();
+		grid.setConstraints(separator_1, c);
+		frame.add(separator_1);
+		//frame.getContentPane().add(separator_1, "2, 16, 9, 1");
+		
+		String spaces = "                                                                        \n\n\n\n\n";
+		
+		c.gridy = 8; c.gridwidth = 5; c.fill = GridBagConstraints.BOTH; 
+		messageBox = new JTextPane(); 
+		messageBox.setText(spaces);
+		messageBox.setEditable(false);
+		
+		grid.setConstraints(messageBox, c);
+		frame.add(messageBox);
+		//frame.getContentPane().add(messageBox, "2, 18, 9, 1, fill, fill");
+		
+		//frame.addWindowListener(new frameWindowListener());
+		frame.pack();
+		
+		Dimension d = label_open.getSize();
+		label_open.setMinimumSize(d);
+		d = messageBox.getSize();
+		messageBox.setMinimumSize(d);
+		
+		
+		d = btn_1.getMinimumSize();
+		d.height = d.height * 3 / 2;
+		btn_1.setMinimumSize(d);
+		btn_2.setMinimumSize(d);
+		btn_3.setMinimumSize(d);
+		btn_4.setMinimumSize(d);
+		
+	}
+	
