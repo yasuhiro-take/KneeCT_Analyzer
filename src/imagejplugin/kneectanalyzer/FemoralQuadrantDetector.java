@@ -19,8 +19,23 @@ import imagejplugin.kneectanalyzer.Quadrant.SysCoord;
 
 public class FemoralQuadrantDetector implements PlugIn {
 	private static Color notchRoofColor = new Color(0,0,255);
+	private double femSize = 500;
+	private double blumenR1 = 10, blumenR2 = 5, blumenSD = 2;
+	private boolean DS0ByCondyle = true;
 	
 	public FemoralQuadrantDetector() {
+	}
+	
+	public void setSagittalFemoralProjectionSize(double size) {
+		femSize = size;
+	}
+	public void setBlumensaatDetectionParams(double r1, double r2, double sd) {
+		blumenR1 = r1;
+		blumenR2 = r2;
+		blumenSD = sd;
+	}
+	public void setDS0ByCondyle(boolean byCondyle) {
+		DS0ByCondyle = byCondyle;
 	}
 	
 	@Override public void run(String arg) {
@@ -40,13 +55,15 @@ public class FemoralQuadrantDetector implements PlugIn {
 		QCurveFitter cf = analyzeBlumensaat(impSagZ);
 		
 		AnalyzeParticle ap = new AnalyzeParticle(ParticleAnalyzer.INCLUDE_HOLES | ParticleAnalyzer.SHOW_MASKS, 
-				0, 500, impSagZ.getCalibration(), null);
+				0, femSize, impSagZ.getCalibration(), null); 
 		ap.analyze(impSagZ, impSagZ.getProcessor(), 16, 255);
 		ImagePlus impSagM = ap.analyzer.getOutputImage();
 		
 		XY refxy[] = getRefCoordsFem(impSagM, cf);
 		XY qxyPx[] = getSystemCoordFem(refxy);
 		correctHL100(impSagM, qxyPx);
+		if (DS0ByCondyle)
+			correctDS0(impSagM, qxyPx);
 		SysCoord.output(Quadrant.FEM, qxyPx, impSagZ.getCalibration());
 		
 		Quadrant.drawAsOverlay(cf.impWork, qxyPx, Quadrant.COORDSTR_FEM);
@@ -60,7 +77,8 @@ public class FemoralQuadrantDetector implements PlugIn {
 	private QCurveFitter analyzeBlumensaat(ImagePlus impSagZ) {
 		int W0 = impSagZ.getWidth(); 
 		Calibration cal = impSagZ.getCalibration();
-		double pxSize = Math.sqrt(Math.pow(cal.pixelWidth, 2) + Math.pow(cal.pixelHeight, 2));
+		//double pxSize = Math.sqrt(Math.pow(cal.pixelWidth, 2) + Math.pow(cal.pixelHeight, 2));
+		double pxSize = cal.pixelHeight;
 		
 		ArrayList<Double> xList = new ArrayList<Double>(), yList = new ArrayList<Double>();
 		RTBoundary.getNotchRoofYZ(xList, yList);
@@ -94,8 +112,8 @@ public class FemoralQuadrantDetector implements PlugIn {
 				boolean out = false;
 				
 				if (sd * pxSize > 5) {
-					if (r * pxSize >= 10) out = true;
-				} else if (sd * pxSize > 2.5 && (r > sd * 2 || r * pxSize >= 5))
+					if (r * pxSize >= blumenR1) out = true; 
+				} else if (sd * pxSize > 2.5 && (r > sd * blumenSD || r * pxSize >= blumenR2)) 
 					out = true;
 				
 				if (out) {
@@ -177,7 +195,6 @@ public class FemoralQuadrantDetector implements PlugIn {
 	private void correctHL100(ImagePlus impSagM, XY qxy[]) {
 		double x1 = qxy[0].x, y1 = qxy[0].y, x2 = qxy[1].x, y2 = qxy[1].y, x3 = qxy[2].x, y3 = qxy[2].y;
 		
-		
 		for (int hl = 100; hl > 75; hl--) {
 			double lx1 = x1 + (x3 - x1) * hl / 100, ly1 = y1 + (y3 - y1) * hl / 100;
 			double lx2 = x2 + (x3 - x1) * hl / 100, ly2 = y2 + (y3 - y1) * hl / 100;
@@ -191,9 +208,22 @@ public class FemoralQuadrantDetector implements PlugIn {
 		}
 	}
 	
-	
-	
-	
+	private void correctDS0(ImagePlus impSagM, XY qxy[]) {
+		double x1 = qxy[0].x, y1 = qxy[0].y, x2 = qxy[1].x, y2 = qxy[1].y, x3 = qxy[2].x, y3 = qxy[2].y;
+		
+		
+		for (int k = 100;;k++) {
+			double lx1 = x1 + (x2 - x1) * k / 100, ly1 = y1 + (y2 - y1) * k / 100;
+			double lx2 = x3 + (x2 - x1) * k / 100, ly2 = y3 + (y2 - y1) * k / 100;
+			
+			double pxdata[] = impSagM.getProcessor().getLine(lx1, ly1, lx2, ly2);
+			if (IJX.Util.getIndexOf(pxdata, 255) == -1) {
+				qxy[1].x = x1 + (x2 - x1) * (k - 1) / 100;
+				qxy[1].y = y1 + (y2 - y1) * (k - 1) / 100;
+				return;
+			}
+		}
+	}
 }
 
 class QCurveFitter extends CurveFitter {
