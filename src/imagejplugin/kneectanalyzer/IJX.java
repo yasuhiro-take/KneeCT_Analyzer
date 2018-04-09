@@ -18,6 +18,7 @@ import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import ij.text.TextWindow;
+import ij.util.Tools;
 
 class IJX {
 	public static ImagePlus zproject(ImagePlus stack, int method, int start, int end) {
@@ -658,6 +659,21 @@ class IJX {
 				ret += values[i] + " ";
 			
 			return ret;
+		}
+		
+		static double[] stringRange2double(String range, double defaultMin, double defaultMax) {
+			String[] minAndMax = Tools.split(range, " -");
+			double min = minAndMax.length>=1 ? Double.parseDouble(minAndMax[0]):0.0;
+			double max = minAndMax.length==2 ? Double.parseDouble(minAndMax[1]):Double.NaN;
+			double ret[] = new double[2];
+			ret[0] = Double.isNaN(min) ? 0 : min;
+			ret[1] = Double.isNaN(max) ? defaultMax : max;
+			
+			return ret;
+		}
+		
+		static double[] stringRange2double(String range) {
+			return stringRange2double(range, 0, Double.MAX_VALUE);
 		}
 	}	
 	
