@@ -364,9 +364,7 @@ public class IJIF3D {
 		private static int multiBones(String title, String msg) {
 			if (univ == null) return 0;
 			
-			Content cFem, cTib;
 			int contentFlag = content2flag(true);
-			int ft = flag2ft(contentFlag);
 			
 			GenericDialog gd = new GenericDialog(title);
 			gd.addMessage(msg);
