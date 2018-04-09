@@ -76,4 +76,8 @@ public class BoundaryData extends Rect {
 		
 		imp.getProcessor().fillRect((int)r.x, (int)r.y, (int)r.w, (int)r.h);
 	}
+	
+	public double getArea() {
+		return w * h;
+	}
 }
