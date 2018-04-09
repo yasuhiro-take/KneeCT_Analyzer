@@ -24,9 +24,12 @@ public class QuadrantGrafter implements PlugIn, ItemListener {
 	private TunnelCoordList tcl;
 	private XY femQ, tibQ;
 	private String name;
+	private int graftSize = 5;
 	
-	@Override public void run(String arg) {
-		
+	public QuadrantGrafter() {
+	}
+	
+	@Override public void run(String arg) {	
 	}
 	
 	public int directrun(String arg) {
@@ -81,6 +84,9 @@ public class QuadrantGrafter implements PlugIn, ItemListener {
 		gd.addNumericField("Tib M-L%", xy.x, 4);
 		gd.addNumericField("Tib A-P%", xy.y, 4);
 		
+		gd.setInsets(10, 0, 0);
+		gd.addNumericField("Graft thickness (pixel)", graftSize, 0);
+		
 		Vector<Choice> choices = gd.getChoices();
 		numFields = gd.getNumericFields();
 		
@@ -94,6 +100,7 @@ public class QuadrantGrafter implements PlugIn, ItemListener {
 			name = "Graft-" + gd.getNextString();
 			femQ = new XY(gd.getNextNumber(), gd.getNextNumber());
 			tibQ = new XY(gd.getNextNumber(), gd.getNextNumber());
+			graftSize = (int)gd.getNextNumber();
 			return 0;
 		}
 		return -1;
@@ -172,7 +179,7 @@ public class QuadrantGrafter implements PlugIn, ItemListener {
 		String size = "size_x="+w+" size_y="+h+" size_z="+d;
 		String c0 = "x0="+Integer.toString((int)fem.x)+" y0="+Integer.toString((int)fem.y)+" z0="+Integer.toString((int)fem.z);
 		String c1 = "x1="+Integer.toString((int)tib.x)+" y1="+Integer.toString((int)tib.y)+" z1="+Integer.toString((int)tib.z);
-		String others = "thickness=5 value=65535 display=[New stack]";
+		String others = "thickness="+Integer.toString(graftSize)+" value=65535 display=[New stack]";
 		
 		String arg = size + " " + c0 + " " + c1 + " " + others;
 		
