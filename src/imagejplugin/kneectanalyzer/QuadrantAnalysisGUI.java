@@ -1,34 +1,10 @@
 package imagejplugin.kneectanalyzer;
 
-import java.awt.EventQueue;
 import java.awt.Frame;
 
-import javax.swing.JFrame;
 
-import com.jgoodies.forms.layout.FormLayout;
-import com.jgoodies.forms.layout.ColumnSpec;
-import com.jgoodies.forms.layout.RowSpec;
-import com.jgoodies.forms.factories.FormFactory; 
-
-import javax.swing.JLabel;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JToggleButton;
-import javax.swing.JSeparator;
-import javax.swing.JTextField;
-
-import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;  
-import java.util.List;
 
-import javax.swing.JTextPane;
-
-import ij.WindowManager;
 import imagejplugin.kneectanalyzer.IJIF;
 
 
