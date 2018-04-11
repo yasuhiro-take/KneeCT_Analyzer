@@ -1,0 +1,129 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <repositories>
+  <!-- NB: for project parent -->
+  <repository>
+    <id>imagej.public</id>
+    <url>http://maven.imagej.net/content/groups/public</url>
+  </repository>
+  </repositories>
+  <groupId>jp.ac.osaka-u.hss</groupId>
+  <artifactId>KneeCT_Analyzer</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.3</version><!--$NO-MVN-MAN-VER$-->
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <parent>
+  	<groupId>org.scijava</groupId>
+  	<artifactId>pom-scijava</artifactId>
+  	<version>16.1.0</version>
+  </parent>
+  <name>KneeCT Analyzer</name>
+  <description>ImageJ PlugIn to analyze kneeCT for ACL reconstruction
+
+This is an ImageJ PlugIn that helps creating an alignment-corrected binary bone model and assists Quadrant-method analysis for tunnel locations in ACLR.
+
+</description>
+  <scm>
+  	<developerConnection>Yasuhiro Take (yasuhiro-take@umin.ac.jp)</developerConnection>
+  </scm>
+  
+	<url>n/a</url>
+	<inceptionYear>2018</inceptionYear>
+	<organization>
+		<name>Osaka University</name>
+		<url>n/a</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>GPLv3</name>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<id>yasuhiro-take</id>
+			<name>Yasuhiro Take</name>
+			<url></url>
+			<roles>
+				<role>lead</role>
+				<role>developer</role>
+				<role>debugger</role>
+				<role>reviewer</role>
+				<role>support</role>
+				<role>maintainer</role>
+			</roles>
+		</developer>
+	</developers>
+	<contributors>
+		<contributor>
+			<name>n/a</name>
+			<url>n/a</url>
+			<properties><id>n/a</id></properties>
+		</contributor>
+	</contributors>
+
+	<mailingLists>
+		<mailingList>
+			<name>ImageJ Forum</name>
+			<archive>http://forum.imagej.net/</archive>
+		</mailingList>
+	</mailingLists>
+
+	
+	<issueManagement>
+		<system>GitHub Issues</system>
+		<url>https://github.com/imagej/example-legacy-plugin/issues</url>
+	</issueManagement>
+	<ciManagement>
+		<system>None</system>
+	</ciManagement>
+
+	<properties>
+		<package-name>imagejplugin.kneectanalyzer</package-name>
+		<main-class>KneeCT_Analyzer</main-class>
+		<license.licenseName>GPLv3</license.licenseName>
+		<license.copyrightOwners>Yasuhiro Take</license.copyrightOwners>
+	</properties>
+	
+  <dependencies>
+  	<dependency>
+  		<groupId>net.imagej</groupId>
+  		<artifactId>ij</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>sc.fiji</groupId>
+  		<artifactId>VIB-lib</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>sc.fiji</groupId>
+  		<artifactId>3D_Viewer</artifactId>
+  	</dependency>
+  </dependencies>
+  
+  <dependencyManagement>
+  	<dependencies>
+  		<dependency>
+  			<groupId>sc.fiji</groupId>
+  			<artifactId>3D_Viewer</artifactId>
+  			<version>4.0.2</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>sc.fiji</groupId>
+  			<artifactId>VIB-lib</artifactId>
+  			<version>2.2.0</version>
+  		</dependency>
+  	</dependencies>
+  </dependencyManagement>
+  
+</project>
